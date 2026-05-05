@@ -2,7 +2,7 @@
 
 > [OpenClaw](https://github.com/openclaw/openclaw) plugin that bundles the [`claw-client`](../claw-client) and turns agent responses into [Generative UI](https://openui.com). After installing the plugin, the gateway serves the full chat UI at `http://localhost:18789/plugins/openclawos` — no separate Next.js process, no tunnel, no settings dialog.
 
-Requires `openclaw >= 2026.5.3`.
+Requires `openclaw >= 2026.4.12`.
 
 ## How it works
 
@@ -31,7 +31,7 @@ openclaw plugins install ./packages/claw-plugin --force
 openclaw gateway restart
 ```
 
-After the first install, add `openclaw-ui-plugin` to `plugins.allow` in `~/.openclaw/openclaw.json` (alongside the stock plugin ids you want to keep loading). Without it, the gateway lazy-reloads the plugin on every tool lookup and `app_create` fails intermittently. `scripts/install.sh` does this automatically; for manual installs run `openclaw config` and pin the plugin.
+After the first install, add `openclaw-ui-plugin` to `plugins.allow` in `~/.openclaw/openclaw.json` (alongside the stock plugin ids you want to keep loading) — but only if you already use an allow list. With an empty `plugins.allow` (allow-all), no action is needed. Without pinning when an allow list is set, the gateway lazy-reloads the plugin on every tool lookup and `app_create` fails intermittently.
 
 Open the UI at `http://localhost:18789/plugins/openclawos`. Paste the gateway URL (`ws://localhost:18789`) and the auth token from `~/.openclaw/openclaw.json` into the Settings dialog on first load. To skip the dialog and get a pre-authenticated URL with the token in the fragment (mirrors `openclaw dashboard`), run `node ../../scripts/open-ui.mjs` from the workspace root.
 
