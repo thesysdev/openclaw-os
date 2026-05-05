@@ -12,9 +12,9 @@ import { join } from "path";
 import { execSync } from "child_process";
 
 const PLUGIN_DIR = join(homedir(), ".openclaw", "openui", "claw-plugin");
-const PLUGIN_REPO = "thesysdev/openclaw-ui/packages/claw-plugin";
+const PLUGIN_REPO = "thesysdev/openclaw-os/packages/claw-plugin";
 
-const PREFIX = "[openclaw-ui]";
+const PREFIX = "[openclaw-os]";
 const DEFAULT_API_BASE = "https://app.generativeui.cloud";
 const DEFAULT_DOMAIN = "generativeui.cloud";
 const DEFAULT_PORT = 18789;
@@ -197,7 +197,7 @@ function installCloudflaredService(tunnelToken) {
 }
 
 function downloadPlugin() {
-  log("==> Downloading OpenClaw UI plugin...");
+  log("==> Downloading OpenClaw OS plugin...");
   log(`    From: ${PLUGIN_REPO}`);
 
   mkdirSync(join(homedir(), ".openclaw", "openui"), { recursive: true });
@@ -229,11 +229,11 @@ function downloadPlugin() {
 }
 
 function installPlugin() {
-  log("==> Installing OpenClaw UI plugin...");
+  log("==> Installing OpenClaw OS plugin...");
   if (isPluginRegistered()) {
     log("    Plugin already registered, reinstalling to pick up updates...");
     try {
-      execSync("openclaw plugins uninstall openclaw-ui-plugin", {
+      execSync("openclaw plugins uninstall openclaw-os-plugin", {
         stdio: "inherit",
       });
       log("    Existing plugin unregistered.");
@@ -261,7 +261,7 @@ function isCloudflaredServiceInstalled() {
 function isPluginRegistered() {
   try {
     const output = execSync("openclaw plugins list", { encoding: "utf8" });
-    return output.includes("openclaw-ui-plugin");
+    return output.includes("openclaw-os-plugin");
   } catch {
     return false;
   }
@@ -443,10 +443,10 @@ function uninstallCloudflaredService() {
 }
 
 function removePlugin() {
-  log("==> Removing OpenClaw UI plugin...");
+  log("==> Removing OpenClaw OS plugin...");
 
   try {
-    execSync("openclaw plugins uninstall openclaw-ui-plugin", { stdio: "inherit" });
+    execSync("openclaw plugins uninstall openclaw-os-plugin", { stdio: "inherit" });
     log("    Plugin unregistered.");
   } catch {
     log("    WARNING: Plugin unregister failed (may not have been installed).");

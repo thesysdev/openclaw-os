@@ -28,7 +28,7 @@ export class ArtifactStore {
   private dir: string;
 
   constructor(stateDir: string) {
-    this.dir = path.join(stateDir, "plugins", "openclaw-ui", "artifacts");
+    this.dir = path.join(stateDir, "plugins", "openclaw-os", "artifacts");
   }
 
   private filePath(id: string): string {

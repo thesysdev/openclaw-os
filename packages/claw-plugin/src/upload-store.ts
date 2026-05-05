@@ -82,7 +82,7 @@ export class UploadStore {
   private indexChain: Promise<unknown> = Promise.resolve();
 
   constructor(stateDir: string) {
-    this.dir = path.join(stateDir, "plugins", "openclaw-ui", "uploads");
+    this.dir = path.join(stateDir, "plugins", "openclaw-os", "uploads");
   }
 
   private indexPath(): string {

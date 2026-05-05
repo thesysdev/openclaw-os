@@ -1,6 +1,6 @@
-# Contributing to OpenClaw UI
+# Contributing to OpenClaw OS
 
-Thank you for considering contributing to OpenClaw UI! This document covers how to set up the repo, what we expect from contributions, and the workflow for opening a pull request.
+Thank you for considering contributing to OpenClaw OS! This document covers how to set up the repo, what we expect from contributions, and the workflow for opening a pull request.
 
 ## Code of Conduct
 
@@ -9,7 +9,7 @@ By participating in this project, you agree to abide by our [Code of Conduct](./
 ## Repository layout
 
 ```
-openclaw-ui/
+openclaw-os/
 ├── packages/
 │   ├── claw-client/   # Next.js generative UI web client
 │   └── claw-plugin/   # OpenClaw server-side plugin
@@ -28,8 +28,8 @@ See [`AGENTS.md`](./AGENTS.md) for protocol details, gateway internals, and the 
 ## Local setup
 
 ```bash
-git clone https://github.com/thesysdev/openclaw-ui.git
-cd openclaw-ui
+git clone https://github.com/thesysdev/openclaw-os.git
+cd openclaw-os
 pnpm install
 ```
 
@@ -105,4 +105,4 @@ Please **do not** report security vulnerabilities through public GitHub issues. 
 
 ## Questions?
 
-Open a [discussion](https://github.com/thesysdev/openclaw-ui/discussions) or join us on [Discord](https://discord.com/invite/Pbv5PsqUSv).
+Open a [discussion](https://github.com/thesysdev/openclaw-os/discussions) or join us on [Discord](https://discord.com/invite/Pbv5PsqUSv).

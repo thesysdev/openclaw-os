@@ -122,14 +122,14 @@ function runStatement<T>(statement: any, mode: "all" | "get" | "run", params: un
 }
 
 export default definePluginEntry({
-  id: "openclaw-ui-plugin",
+  id: "openclaw-os-plugin",
   name: "Claw — OpenUI for OpenClaw",
   description:
     "Injects the OpenUI Lang system prompt for requests originating from the Claw client, enabling Generative UI responses instead of plain markdown.",
   configSchema: emptyPluginConfigSchema,
 
   register(api) {
-    api.logger.info("[openclaw-ui-plugin] register() called — plugin loaded OK");
+    api.logger.info("[openclaw-os-plugin] register() called — plugin loaded OK");
 
     // ── Static UI route ─────────────────────────────────────────────────────
     // Serves the claw-client static export bundled into ../static/ at install
@@ -245,7 +245,7 @@ export default definePluginEntry({
     // `<available_skills>` block, so this hook only adds the two-line nudge
     // that tells the agent which skill to load when.
     api.on("before_prompt_build", (_event, ctx) => {
-      if (!ctx.sessionKey?.endsWith(":openclaw-ui")) {
+      if (!ctx.sessionKey?.endsWith(":openclaw-os")) {
         return;
       }
       return { prependSystemContext: CLAW_PREAMBLE };
@@ -256,7 +256,7 @@ export default definePluginEntry({
     const getStore = (): ArtifactStore => {
       if (!store) {
         const stateDir = api.runtime.state.resolveStateDir();
-        api.logger.info(`[openclaw-ui-plugin] initialising ArtifactStore at: ${stateDir}`);
+        api.logger.info(`[openclaw-os-plugin] initialising ArtifactStore at: ${stateDir}`);
         store = new ArtifactStore(stateDir);
       }
       return store;
@@ -294,7 +294,7 @@ export default definePluginEntry({
 
     const resolveDatabasePath = async (namespace: string): Promise<string> => {
       const stateDir = api.runtime.state.resolveStateDir();
-      const dbDir = path.join(stateDir, "plugins", "openclaw-ui", "db");
+      const dbDir = path.join(stateDir, "plugins", "openclaw-os", "db");
       await mkdir(dbDir, { recursive: true });
       return path.join(dbDir, `${namespace}.sqlite`);
     };
@@ -392,7 +392,7 @@ export default definePluginEntry({
 
     // ── Artifact tools ──────────────────────────────────────────────────────
 
-    api.logger.info("[openclaw-ui-plugin] registering tools…");
+    api.logger.info("[openclaw-os-plugin] registering tools…");
 
     api.registerTool((ctx: OpenClawPluginToolContext) => ({
       name: "create_markdown_artifact",
@@ -580,12 +580,12 @@ export default definePluginEntry({
       },
       execute: async (_callId: string, params: { title: string; code: string }) => {
         api.logger.info(
-          `[openclaw-ui-plugin] app_create: title="${params.title}" code=${params.code.length} chars`,
+          `[openclaw-os-plugin] app_create: title="${params.title}" code=${params.code.length} chars`,
         );
         const lint = lintOpenUICode(params.code);
         if (!lint.ok) {
           api.logger.info(
-            `[openclaw-ui-plugin] app_create lint: ${lint.findings.length} finding(s) — ${lint.summary.slice(0, 180)}`,
+            `[openclaw-os-plugin] app_create lint: ${lint.findings.length} finding(s) — ${lint.summary.slice(0, 180)}`,
           );
         }
         const app = await getAppStore().create({
@@ -594,7 +594,7 @@ export default definePluginEntry({
           agentId: ctx.agentId ?? "main",
           sessionKey: ctx.sessionKey ?? "",
         });
-        api.logger.info(`[openclaw-ui-plugin] app_create → saved app ${app.id}`);
+        api.logger.info(`[openclaw-os-plugin] app_create → saved app ${app.id}`);
         return jsonResult({
           id: app.id,
           title: app.title,
@@ -643,19 +643,19 @@ export default definePluginEntry({
         if (!existing) return jsonResult({ error: "App not found", id: params.id });
 
         api.logger.info(
-          `[openclaw-ui-plugin] app_update: id=${params.id} patch=${params.patch.length} chars`,
+          `[openclaw-os-plugin] app_update: id=${params.id} patch=${params.patch.length} chars`,
         );
 
         const merged = mergeStatements(existing.content, params.patch);
         const lint = lintOpenUICode(merged);
         if (!lint.ok) {
           api.logger.info(
-            `[openclaw-ui-plugin] app_update lint: ${lint.findings.length} finding(s) — ${lint.summary.slice(0, 180)}`,
+            `[openclaw-os-plugin] app_update lint: ${lint.findings.length} finding(s) — ${lint.summary.slice(0, 180)}`,
           );
         }
 
         const updated = await getAppStore().update(params.id, { content: merged });
-        api.logger.info(`[openclaw-ui-plugin] app_update → updated app ${updated.id}`);
+        api.logger.info(`[openclaw-os-plugin] app_update → updated app ${updated.id}`);
         return jsonResult({
           id: updated.id,
           updatedAt: updated.updatedAt,
@@ -664,7 +664,7 @@ export default definePluginEntry({
       },
     }));
 
-    api.logger.info("[openclaw-ui-plugin] all tools registered");
+    api.logger.info("[openclaw-os-plugin] all tools registered");
 
     // ── Gateway RPC methods — client reads/writes ───────────────────────────
 
@@ -1056,7 +1056,7 @@ export default definePluginEntry({
       const command = typeof args["command"] === "string" ? args["command"] : "";
       if (!command) throw new Error("exec requires a 'command' argument");
       const timeoutMs = typeof args["timeout_ms"] === "number" ? args["timeout_ms"] : 30_000;
-      api.logger.info(`[openclaw-ui-plugin] invokeTool(exec): command=${command.slice(0, 120)}`);
+      api.logger.info(`[openclaw-os-plugin] invokeTool(exec): command=${command.slice(0, 120)}`);
       try {
         const result = await api.runtime.system.runCommandWithTimeout(["sh", "-c", command], {
           timeoutMs,
@@ -1092,7 +1092,7 @@ export default definePluginEntry({
     const invokeReadTool = async (args: Record<string, unknown>): Promise<unknown> => {
       const filePath = typeof args["file_path"] === "string" ? args["file_path"] : "";
       if (!filePath) throw new Error("read requires a 'file_path' argument");
-      api.logger.info(`[openclaw-ui-plugin] invokeTool(read): path=${filePath}`);
+      api.logger.info(`[openclaw-os-plugin] invokeTool(read): path=${filePath}`);
       const { readFile } = await import("node:fs/promises");
       const content = await readFile(filePath, "utf-8");
       return { content };
@@ -1150,12 +1150,12 @@ export default definePluginEntry({
         }
 
         try {
-          api.logger.info(`[openclaw-ui-plugin] tools.invoke: tool=${toolName}`);
+          api.logger.info(`[openclaw-os-plugin] tools.invoke: tool=${toolName}`);
           const result = await invokeTool(toolName, toolArgs, sessionKey);
           respond(true, { result });
         } catch (e) {
           api.logger.error(
-            `[openclaw-ui-plugin] tools.invoke failed: tool=${toolName} error=${e instanceof Error ? e.message : String(e)}`,
+            `[openclaw-os-plugin] tools.invoke failed: tool=${toolName} error=${e instanceof Error ? e.message : String(e)}`,
           );
           respond(false, undefined, {
             message: e instanceof Error ? e.message : "Tool invocation failed",
@@ -1165,6 +1165,6 @@ export default definePluginEntry({
       },
     );
 
-    api.logger.info("[openclaw-ui-plugin] gateway RPC methods registered");
+    api.logger.info("[openclaw-os-plugin] gateway RPC methods registered");
   },
 });

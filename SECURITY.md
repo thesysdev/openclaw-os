@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-We take the security of OpenClaw UI seriously. If you believe you have found a security vulnerability in either `@openuidev/claw-client` or `@openuidev/openclaw-ui-plugin`, please report it to us through GitHub's Security Advisory **"Report a Vulnerability"** tab.
+We take the security of OpenClaw OS seriously. If you believe you have found a security vulnerability in either `@openuidev/claw-client` or `@openuidev/openclaw-os-plugin`, please report it to us through GitHub's Security Advisory **"Report a Vulnerability"** tab.
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
@@ -14,4 +14,4 @@ Instead:
 
 We will respond as quickly as possible to your report and work with you to verify and address the issue. Once a fix is available we will coordinate disclosure with you.
 
-Thank you for helping keep OpenClaw UI and its users safe!
+Thank you for helping keep OpenClaw OS and its users safe!

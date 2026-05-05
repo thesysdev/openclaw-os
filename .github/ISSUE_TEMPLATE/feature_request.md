@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for OpenClaw UI
+about: Suggest an idea for OpenClaw OS
 title: ""
 labels: enhancement
 assignees: ""
@@ -15,7 +15,7 @@ A clear and concise description of what you want to happen.
 **Which package would this affect?**
 
 - [ ] `@openuidev/claw-client`
-- [ ] `@openuidev/openclaw-ui-plugin`
+- [ ] `@openuidev/openclaw-os-plugin`
 - [ ] Both
 - [ ] Not sure
 

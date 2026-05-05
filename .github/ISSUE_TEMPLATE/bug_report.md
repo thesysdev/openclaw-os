@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help us improve OpenClaw UI
+about: Create a report to help us improve OpenClaw OS
 title: ""
 labels: bug
 assignees: ""
@@ -12,7 +12,7 @@ A clear and concise description of what the bug is.
 **Affected package**
 
 - [ ] `@openuidev/claw-client`
-- [ ] `@openuidev/openclaw-ui-plugin`
+- [ ] `@openuidev/openclaw-os-plugin`
 - [ ] Both
 - [ ] Not sure
 
@@ -38,7 +38,7 @@ If applicable, add screenshots to help explain your problem.
 - pnpm version: [e.g. 9.15.4]
 - OpenClaw gateway version: [e.g. 0.4.0]
 - `@openuidev/claw-client` version: [e.g. 0.1.0]
-- `@openuidev/openclaw-ui-plugin` version: [e.g. 0.1.1]
+- `@openuidev/openclaw-os-plugin` version: [e.g. 0.1.1]
 
 **Gateway logs**
 

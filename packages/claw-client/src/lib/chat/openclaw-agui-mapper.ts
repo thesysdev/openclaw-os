@@ -22,7 +22,7 @@ import { encodeAssistantTimelineSegment } from "@/lib/chat/timeline";
 import type { AgentEvent, ChatEvent } from "@/lib/gateway/types";
 import { EventType } from "@openuidev/react-headless";
 
-const DEBUG_STORAGE_KEY = "openclaw-ui-debug-events";
+const DEBUG_STORAGE_KEY = "openclaw-os-debug-events";
 const TOOL_RESULT_KNOWN_KEYS = new Set(["phase", "name", "toolCallId", "isError", "durationMs"]);
 
 function resolveToolResultPayload(data: Record<string, unknown>): unknown {

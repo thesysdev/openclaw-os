@@ -702,7 +702,7 @@ export function AssistantMessage({ message }: Props) {
     ) : isGatewayInjected ? (
       <div
         key={`text-${i}`}
-        className="openclaw-ui-assistant-markdown mr-auto w-full max-w-3xl border-l-2 border-border-default/40 bg-transparent pl-m"
+        className="openclaw-os-assistant-markdown mr-auto w-full max-w-3xl border-l-2 border-border-default/40 bg-transparent pl-m"
       >
         {i === 0 ? (
           <div className="mb-xs inline-flex items-center gap-xs rounded-full bg-text-neutral-tertiary/10 px-s py-[2px] font-body text-xs text-text-neutral-tertiary">
@@ -716,7 +716,7 @@ export function AssistantMessage({ message }: Props) {
     ) : (
       <div
         key={`text-${i}`}
-        className="openclaw-ui-assistant-markdown mr-auto w-full max-w-3xl rounded-4xl border border-border-default/40 bg-background px-ml py-m shadow-sm dark:border-border-default/20 dark:bg-sunk-deep"
+        className="openclaw-os-assistant-markdown mr-auto w-full max-w-3xl rounded-4xl border border-border-default/40 bg-background px-ml py-m shadow-sm dark:border-border-default/20 dark:bg-sunk-deep"
       >
         <div className={ASSISTANT_MARKDOWN_CLASSES}>
           <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{segment.content}</ReactMarkdown>

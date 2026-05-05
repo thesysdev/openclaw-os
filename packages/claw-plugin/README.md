@@ -1,6 +1,8 @@
-# @openuidev/openclaw-ui-plugin
+# @openuidev/openclaw-os-plugin
 
 > [OpenClaw](https://github.com/openclaw/openclaw) plugin that bundles the [`claw-client`](../claw-client) and turns agent responses into [Generative UI](https://openui.com). After installing the plugin, the gateway serves the full chat UI at `http://localhost:18789/plugins/openclawos` — no separate Next.js process, no tunnel, no settings dialog.
+
+This is the server side of [OpenClaw OS](../../README.md). The other half is the browser-side [`@openuidev/claw-client`](../claw-client).
 
 Requires `openclaw >= 2026.4.12`.
 
@@ -8,7 +10,7 @@ Requires `openclaw >= 2026.4.12`.
 
 The plugin does two things in the same package:
 
-1. **Prompt injection.** Registers a `before_prompt_build` hook. For each agent run originating from the claw-client, it prepends the OpenUI Lang system prompt so the LLM emits structured UI instead of plain markdown. Detected by session-key suffix `:openclaw-ui` — runs from other clients are unaffected.
+1. **Prompt injection.** Registers a `before_prompt_build` hook. For each agent run originating from the claw-client, it prepends the OpenUI Lang system prompt so the LLM emits structured UI instead of plain markdown. Detected by session-key suffix `:openclaw-os` — runs from other clients are unaffected.
 2. **Static UI serving.** Registers an HTTP route at `/plugins/openclawos` (via `api.registerHttpRoute`). The route serves the prebuilt claw-client static export (Next.js `output: "export"`) bundled into the plugin's `static/` directory. Browser tabs load the UI from the gateway origin and connect back over the same-origin WebSocket — no CORS, no allowed-origins config, no tunnel.
 
 The plugin also exposes lightweight stores for **apps**, **artifacts**, **notifications**, and **uploads**. These give the agent persistent, addressable UI primitives that the client can render and update across turns. See `app-store.ts`, `artifact-store.ts`, `notification-store.ts`, `upload-store.ts`.
@@ -31,7 +33,7 @@ openclaw plugins install ./packages/claw-plugin --force
 openclaw gateway restart
 ```
 
-After the first install, add `openclaw-ui-plugin` to `plugins.allow` in `~/.openclaw/openclaw.json` (alongside the stock plugin ids you want to keep loading) — but only if you already use an allow list. With an empty `plugins.allow` (allow-all), no action is needed. Without pinning when an allow list is set, the gateway lazy-reloads the plugin on every tool lookup and `app_create` fails intermittently.
+After the first install, add `openclaw-os-plugin` to `plugins.allow` in `~/.openclaw/openclaw.json` (alongside the stock plugin ids you want to keep loading) — but only if you already use an allow list. With an empty `plugins.allow` (allow-all), no action is needed. Without pinning when an allow list is set, the gateway lazy-reloads the plugin on every tool lookup and `app_create` fails intermittently.
 
 Open the UI at `http://localhost:18789/plugins/openclawos`. Paste the gateway URL (`ws://localhost:18789`) and the auth token from `~/.openclaw/openclaw.json` into the Settings dialog on first load. To skip the dialog and get a pre-authenticated URL with the token in the fragment (mirrors `openclaw dashboard`), run `node ../../scripts/open-ui.mjs` from the workspace root.
 
@@ -86,7 +88,7 @@ packages/claw-plugin/
 
 - `openclaw` is in `peerDependencies` and `devDependencies`, never `dependencies`. The runtime gateway provides the module.
 - Types come from subpath exports: `import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry"` and `from "openclaw/plugin-sdk/core"`. See [`AGENTS.md`](../../AGENTS.md) for the full guidance.
-- The plugin ships compiled JS at `dist/index.js`, bundled by esbuild. `package.json` `main` and `openclaw.runtimeExtensions` both point there. Older "jiti loads `.ts` directly" behavior was removed in openclaw 2026.5.x.
+- The plugin ships compiled JS at `dist/index.js`, bundled by esbuild. `package.json` `main` and `openclaw.extensions` both point there. Older "jiti loads `.ts` directly" behavior was removed in openclaw 2026.5.x.
 - Plugin RPCs and tools that share names with gateway-core surfaces (`artifacts.*`, `tools.invoke`) are namespaced under `openclawos.*` to avoid collision.
 - The `static/` directory is treated as opaque content. The plugin's HTTP handler serves whatever is in there with sensible MIME types and a path-traversal guard. `pnpm bundle-ui` is the only thing that should write to it.
 - For end-user setup story, architecture rationale, and what's still TODO, see [`docs/openclaw-os-bundling.md`](../../docs/openclaw-os-bundling.md).

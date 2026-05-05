@@ -1,5 +1,5 @@
 {
-  "id": "openclaw-ui-plugin",
+  "id": "openclaw-os-plugin",
   "name": "Claw — OpenUI for OpenClaw",
   "description": "Enables Generative UI in the Claw client by injecting the OpenUI Lang system prompt for direct WebSocket chat sessions.",
   "version": "0.1.1",

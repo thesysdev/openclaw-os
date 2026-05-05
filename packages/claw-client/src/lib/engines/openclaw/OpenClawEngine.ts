@@ -192,7 +192,7 @@ export class OpenClawEngine implements Engine {
    *  threadId is recognized as an agent id, so any RPC that uses it must wait
    *  for hydration — otherwise a cold-start `chat.history("main")` lands on
    *  the bare `"main"` key while the post-hydration call uses the encoded
-   *  `agent:main:main:openclaw-ui`, splitting reads across two transcripts. */
+   *  `agent:main:main:openclaw-os`, splitting reads across two transcripts. */
   private _agentIdsHydrated = false;
   private _agentIdsHydratedPromise: Promise<void>;
   private _resolveAgentIdsHydrated!: () => void;
@@ -1233,7 +1233,7 @@ export class OpenClawEngine implements Engine {
     // session key. Otherwise a cold-start call with `sessionId === "main"`
     // returns the bare `"main"` key (because the agent id isn't in the set
     // yet), which addresses a different transcript on the gateway than the
-    // post-hydration encoded form `agent:main:main:openclaw-ui`.
+    // post-hydration encoded form `agent:main:main:openclaw-os`.
     await this._agentIdsHydratedPromise;
     const sessionKey = resolveChatSessionKey(sessionId, this.knownAgentIds);
     log(`loadHistory  sessionId=${sessionId}  sessionKey=${sessionKey}`);

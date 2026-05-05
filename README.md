@@ -1,17 +1,17 @@
 <div align="center">
 
 <!-- Replace with hosted banner when available -->
-<!-- <img src="./assets/banner.png" alt="OpenClaw UI — Generative UI for OpenClaw" width="100%"> -->
+<!-- <img src="./assets/banner.png" alt="OpenClaw OS — Generative UI for OpenClaw" width="100%"> -->
 
-# OpenClaw UI — Generative UI for OpenClaw
+# OpenClaw OS — Generative UI for OpenClaw
 
-[![Build & Check](https://github.com/thesysdev/openclaw-ui/actions/workflows/build.yml/badge.svg)](https://github.com/thesysdev/openclaw-ui/actions/workflows/build.yml)
+[![Build & Check](https://github.com/thesysdev/openclaw-os/actions/workflows/build.yml/badge.svg)](https://github.com/thesysdev/openclaw-os/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Chat-7289da?logo=discord&logoColor=white)](https://discord.com/invite/Pbv5PsqUSv)
 
 </div>
 
-OpenClaw UI is the **OpenClaw integration for [OpenUI](https://openui.com)** — a server-side plugin and a streaming web client that turn any OpenClaw agent's responses into live, interactive UI: charts, tables, forms, dashboards, cards. Instead of plain markdown, agents emit structured [OpenUI Lang](https://openui.com), and the client renders it as React components in real time.
+OpenClaw OS is the **OpenClaw integration for [OpenUI](https://openui.com)** — a server-side plugin and a streaming web client that turn any OpenClaw agent's responses into live, interactive UI: charts, tables, forms, dashboards, cards. Instead of plain markdown, agents emit structured [OpenUI Lang](https://openui.com), and the client renders it as React components in real time.
 
 ---
 
@@ -19,17 +19,17 @@ OpenClaw UI is the **OpenClaw integration for [OpenUI](https://openui.com)** —
 
 ---
 
-## What is OpenClaw UI?
+## What is OpenClaw OS?
 
 <!-- Add demo gif here:
 <div align="center">
-  <img src="./assets/demo.gif" alt="OpenClaw UI demo - agent responding with a live dashboard" width="100%" />
+  <img src="./assets/demo.gif" alt="OpenClaw OS demo - agent responding with a live dashboard" width="100%" />
 </div>
 -->
 
-OpenClaw UI is a two-part system that adds generative UI to any OpenClaw agent:
+OpenClaw OS is a two-part system that adds generative UI to any OpenClaw agent:
 
-- **`@openuidev/openclaw-ui-plugin`** — an OpenClaw server-side plugin that detects Claw sessions and injects an OpenUI Lang system prompt into the agent's context, so the LLM responds with structured UI markup instead of text.
+- **`@openuidev/openclaw-os-plugin`** — an OpenClaw server-side plugin that detects Claw sessions and injects an OpenUI Lang system prompt into the agent's context, so the LLM responds with structured UI markup instead of text.
 - **`@openuidev/claw-client`** — a Next.js web client that connects to your OpenClaw gateway over WebSocket and renders agent responses as live, interactive components using the OpenUI React renderer.
 
 **Core capabilities:**
@@ -48,8 +48,8 @@ OpenClaw UI is a two-part system that adds generative UI to any OpenClaw agent:
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/thesysdev/openclaw-ui.git
-cd openclaw-ui
+git clone https://github.com/thesysdev/openclaw-os.git
+cd openclaw-os
 pnpm install
 ```
 
@@ -88,7 +88,7 @@ flowchart LR
     E --> F["Live UI in browser"]
 ```
 
-1. The Claw client opens a session with the gateway using a key suffixed with `:openclaw-ui`.
+1. The Claw client opens a session with the gateway using a key suffixed with `:openclaw-os`.
 2. On each agent run, `claw-plugin`'s `before_prompt_build` hook detects the suffix and prepends the OpenUI Lang system prompt.
 3. The LLM streams structured component markup back over the gateway protocol.
 4. `claw-client` parses the stream and renders the components progressively into the chat surface.
@@ -103,7 +103,7 @@ See [`AGENTS.md`](./AGENTS.md) for the full protocol, the plugin detection mecha
 
 | Package | Description |
 | :--- | :--- |
-| [`@openuidev/openclaw-ui-plugin`](./packages/claw-plugin) | OpenClaw server-side plugin. Injects the OpenUI Lang system prompt and provides app, artifact, notification, and upload stores. |
+| [`@openuidev/openclaw-os-plugin`](./packages/claw-plugin) | OpenClaw server-side plugin. Injects the OpenUI Lang system prompt and provides app, artifact, notification, and upload stores. |
 | [`@openuidev/claw-client`](./packages/claw-client) | Next.js web client. Connects to the gateway over WebSocket and renders agent output as live components. |
 
 Both packages live in this monorepo and are linked via pnpm workspaces. They are versioned together for now.
@@ -113,7 +113,7 @@ Both packages live in this monorepo and are linked via pnpm workspaces. They are
 ## Repository structure
 
 ```
-openclaw-ui/
+openclaw-os/
 ├── packages/
 │   ├── claw-client/      # Next.js generative UI web client
 │   └── claw-plugin/      # OpenClaw server-side plugin (single .ts entry)
@@ -175,8 +175,8 @@ See the [OpenUI documentation](https://openui.com) and [token efficiency benchma
 ## Community
 
 - [Discord](https://discord.com/invite/Pbv5PsqUSv) — Ask questions, share what you're building
-- [GitHub Issues](https://github.com/thesysdev/openclaw-ui/issues) — Report bugs or request features
-- [GitHub Discussions](https://github.com/thesysdev/openclaw-ui/discussions) — Longer-form questions and ideas
+- [GitHub Issues](https://github.com/thesysdev/openclaw-os/issues) — Report bugs or request features
+- [GitHub Discussions](https://github.com/thesysdev/openclaw-os/discussions) — Longer-form questions and ideas
 
 ---
 

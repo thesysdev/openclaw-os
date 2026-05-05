@@ -2,15 +2,15 @@
   "name": "claw-workspace",
   "private": true,
   "version": "0.0.0",
-  "description": "OpenClaw UI — Generative UI client and OpenClaw plugin powered by OpenUI Lang",
+  "description": "OpenClaw OS — Generative UI client and OpenClaw plugin powered by OpenUI Lang",
   "homepage": "https://openui.com",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/thesysdev/openclaw-ui.git"
+    "url": "https://github.com/thesysdev/openclaw-os.git"
   },
   "bugs": {
-    "url": "https://github.com/thesysdev/openclaw-ui/issues"
+    "url": "https://github.com/thesysdev/openclaw-os/issues"
   },
   "engines": {
     "node": ">=20"

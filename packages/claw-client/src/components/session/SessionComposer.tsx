@@ -550,9 +550,9 @@ export function SessionComposer({
       setTextContent(detail.text);
       requestAnimationFrame(() => textareaRef.current?.focus());
     };
-    window.addEventListener("openclaw-ui:prime-composer", listener as EventListener);
+    window.addEventListener("openclaw-os:prime-composer", listener as EventListener);
     return () =>
-      window.removeEventListener("openclaw-ui:prime-composer", listener as EventListener);
+      window.removeEventListener("openclaw-os:prime-composer", listener as EventListener);
   }, []);
 
   const applySlashCompletion = (entry: SlashEntry) => {
@@ -683,7 +683,7 @@ export function SessionComposer({
 
   return (
     <div
-      className={`openclaw-ui-session-composer relative mb-1 w-full rounded-xl border border-border-default/25 bg-foreground p-[2px] sm:mb-3 dark:border-border-default/8 ${
+      className={`openclaw-os-session-composer relative mb-1 w-full rounded-xl border border-border-default/25 bg-foreground p-[2px] sm:mb-3 dark:border-border-default/8 ${
         isDragOver ? "ring-2 ring-text-accent-primary ring-offset-2" : ""
       }`}
       onDragEnter={handleDragEnter}

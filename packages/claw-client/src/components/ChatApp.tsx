@@ -328,7 +328,7 @@ function ThreadArea({
    * per-session.
    *
    * Resolution order:
-   *  1. Parse `agent:<id>:<slot>:openclaw-ui` directly from the route key
+   *  1. Parse `agent:<id>:<slot>:openclaw-os` directly from the route key
    *     — works pre-fetch (URL is the source of truth, no race vs. threads
    *     loading).
    *  2. Bare agent id stored on the synthetic main-thread item (`a.id`).
@@ -708,7 +708,7 @@ function ThreadArea({
           onChange={handleFilesSelected}
         />
 
-        <ClawThreadContainer className="openclaw-ui-thread-container min-w-0 flex-1">
+        <ClawThreadContainer className="openclaw-os-thread-container min-w-0 flex-1">
           {/* `Shell.MobileHeader` was previously rendered here. It stacked
               on top of `AgentTopBar` on mobile and its buttons routed to
               react-headless / Shell's own sidebar, neither of which we
@@ -2395,7 +2395,7 @@ function ChatAppInner({
               navigate({ view: "artifact", artifactId: target.artifactId });
             } else if (target.kind === "command") {
               if (route.view !== "chat") navigate({ view: "home" });
-              const evt = new CustomEvent("openclaw-ui:prime-composer", {
+              const evt = new CustomEvent("openclaw-os:prime-composer", {
                 detail: { text: `/${target.command.name} ` },
               });
               window.dispatchEvent(evt);
@@ -2471,7 +2471,7 @@ function ChatAppInner({
             // in a chat, drop them into the home route first so the composer
             // is visible.
             if (route.view !== "chat") navigate({ view: "home" });
-            const evt = new CustomEvent("openclaw-ui:prime-composer", {
+            const evt = new CustomEvent("openclaw-os:prime-composer", {
               detail: { text: `/${target.command.name} ` },
             });
             window.dispatchEvent(evt);
@@ -2666,7 +2666,7 @@ export default function ChatApp() {
 
       // Hydrate sent uploads from the plugin (server-authoritative). Resolve
       // the sessionKey first — the raw threadId may be an agent id that
-      // resolveChatSessionKey expands to `agent:<id>:main:openclaw-ui`.
+      // resolveChatSessionKey expands to `agent:<id>:main:openclaw-os`.
       let remoteUploads: ThreadUpload[] = [];
       const uploadsStore = uploadsRef.current;
       if (uploadsStore) {

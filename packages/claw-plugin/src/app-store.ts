@@ -29,7 +29,7 @@ export class AppStore {
   private dir: string;
 
   constructor(stateDir: string) {
-    this.dir = path.join(stateDir, "plugins", "openclaw-ui", "apps");
+    this.dir = path.join(stateDir, "plugins", "openclaw-os", "apps");
   }
 
   private filePath(id: string): string {

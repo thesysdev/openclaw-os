@@ -1,6 +1,6 @@
 "use client";
 
-const STORAGE_KEY = "openclaw-ui:pinned-apps";
+const STORAGE_KEY = "openclaw-os:pinned-apps";
 
 export function loadPinnedAppIds(): string[] {
   if (typeof window === "undefined") return [];

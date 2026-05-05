@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 
 const INSTALL_COMMAND =
-  "curl -fsSL https://raw.githubusercontent.com/thesysdev/openclaw-ui/main/scripts/setup-tunnel.mjs -o /tmp/claw-setup.mjs && node /tmp/claw-setup.mjs";
+  "curl -fsSL https://raw.githubusercontent.com/thesysdev/openclaw-os/main/scripts/setup-tunnel.mjs -o /tmp/claw-setup.mjs && node /tmp/claw-setup.mjs";
 
 export function AutomatedSetup() {
   const [copied, setCopied] = useState(false);

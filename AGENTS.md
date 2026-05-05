@@ -26,7 +26,7 @@ In this repo these are inlined into `packages/claw-client/src/lib/gateway/types.
 
 ## How plugin detection works
 
-The Claw client appends `:openclaw-ui` to its session key (e.g. `agent:main:main:openclaw-ui`). The plugin's `before_prompt_build` hook checks for this suffix and, when present, prepends the OpenUI Lang system prompt. The agent then streams back component markup which the client renders in real time. Sessions from other clients are unaffected.
+The Claw client appends `:openclaw-os` to its session key (e.g. `agent:main:main:openclaw-os`). The plugin's `before_prompt_build` hook checks for this suffix and, when present, prepends the OpenUI Lang system prompt. The agent then streams back component markup which the client renders in real time. Sessions from other clients are unaffected.
 
 ## Agents → Sessions → Threads mental model
 
@@ -46,13 +46,13 @@ agent:<agentId>:<channel>:<senderId?>
 **Current mapping in this codebase:**
 ```
 Agent ID (from agents.list)
-  → session key: agent:<id>:main:openclaw-ui
+  → session key: agent:<id>:main:openclaw-os
     → one thread in the sidebar
       → chat.history fetches messages for that key
       → chat.send writes messages to that key
 ```
 
-The `:openclaw-ui` suffix makes Claw's session isolated from other clients. Removing it would make it shared (same history as `openclaw chat` CLI).
+The `:openclaw-os` suffix makes Claw's session isolated from other clients. Removing it would make it shared (same history as `openclaw chat` CLI).
 
 **Key rule:** one agent = one session key = one thread = one conversation. There is no concept of starting a "new chat" with an agent — you always continue the same session.
 

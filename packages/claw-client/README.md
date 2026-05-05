@@ -2,7 +2,7 @@
 
 > Next.js web client that connects to an [OpenClaw](https://github.com/openclaw/openclaw) gateway and renders agent responses as live, interactive UI using the [OpenUI](https://openui.com) React renderer.
 
-This is the browser side of [OpenClaw UI](../../README.md). The other half is the server-side [`@openuidev/openclaw-ui-plugin`](../claw-plugin), which injects the OpenUI Lang system prompt into agent runs.
+This is the browser side of [OpenClaw OS](../../README.md). The other half is the server-side [`@openuidev/openclaw-os-plugin`](../claw-plugin), which injects the OpenUI Lang system prompt into agent runs.
 
 <!-- Add screenshot / gif here:
 <div align="center">
@@ -45,7 +45,7 @@ Then in this package:
 pnpm dev      # Next.js dev server on http://localhost:18790
 ```
 
-You will also need an OpenClaw gateway running with [`@openuidev/openclaw-ui-plugin`](../claw-plugin) installed. See the [root README](../../README.md#quick-start) for the end-to-end setup.
+You will also need an OpenClaw gateway running with [`@openuidev/openclaw-os-plugin`](../claw-plugin) installed. See the [root README](../../README.md#quick-start) for the end-to-end setup.
 
 ### Connecting to a gateway
 
@@ -102,7 +102,7 @@ pnpm exec opennextjs-cloudflare deploy
 
 - **Settings won't save** — the client persists settings to `localStorage`. Make sure third-party storage is enabled in your browser.
 - **Gateway connection fails** — verify the URL is reachable and the auth token is valid using `node scripts/connection-info.mjs` from the repo root.
-- **Agent responds in plain text** — confirm `@openuidev/openclaw-ui-plugin` is installed in the gateway and that the gateway has been restarted since install.
+- **Agent responds in plain text** — confirm `@openuidev/openclaw-os-plugin` is installed in the gateway and that the gateway has been restarted since install.
 
 ## License
 
