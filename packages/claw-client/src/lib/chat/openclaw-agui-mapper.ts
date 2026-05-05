@@ -48,17 +48,6 @@ export function createOpenClawAGUIMapper(onEvent: (event: Record<string, unknown
 } {
   let messageId: string | null = null;
   let emittedTextContent = false;
-  // Track the cumulative assistant text we've emitted so far. The gateway's
-  // assistant-text resolver (`agent-event-assistant-text.ts`) accepts both
-  // incremental `data.delta` AND cumulative `data.text`/`data.delta`-as-snapshot
-  // shapes interchangeably depending on the upstream provider. When a chunk
-  // arrives whose text is a strict superset of what we've already emitted —
-  // i.e. the chunk is a cumulative snapshot, not an incremental token — we
-  // emit only the *suffix* as the AG-UI delta. Otherwise the AG-UI consumer
-  // (`processStreamedMessage`) would string-concat the cumulative buffer onto
-  // itself, producing the "every character repeats 2-3 times during streaming,
-  // fixes on history reload" bug.
-  let emittedAssistantText = "";
   const activeToolCallIds = new Set<string>();
 
   const extractTextFromMessageContent = (message: unknown): string => {
@@ -226,33 +215,18 @@ export function createOpenClawAGUIMapper(onEvent: (event: Record<string, unknown
       }
 
       if (evt.stream === "assistant") {
+        // `data.delta` from the openclaw 2026.5.x gateway is already
+        // incremental — the resolver subtracts cumulative snapshots upstream
+        // and emits only the new tokens. Forward straight to the AG-UI
+        // consumer; no client-side dedupe needed.
         if (typeof evt.data.delta === "string" && evt.data.delta) {
-          // If the chunk's text is a strict prefix of (or equal to) what we've
-          // already streamed, the upstream provider is emitting cumulative
-          // snapshots, not incremental tokens — emit only the suffix so the
-          // AG-UI consumer doesn't append-to-cumulative and triple every char.
-          const incoming: string = evt.data.delta;
-          let incrementalDelta = incoming;
-          if (emittedAssistantText && incoming.startsWith(emittedAssistantText)) {
-            incrementalDelta = incoming.slice(emittedAssistantText.length);
-          }
-          debugLog("agent:assistant->content", {
-            runId: evt.runId,
-            seq: evt.seq,
-            activeToolCallIds: [...activeToolCallIds],
-            delta: incrementalDelta,
-            cumulativeDetected: incrementalDelta !== incoming,
+          ensureMessageStarted(evt.runId);
+          emittedTextContent = true;
+          emitEvent({
+            type: EventType.TEXT_MESSAGE_CONTENT,
+            messageId,
+            delta: evt.data.delta,
           });
-          if (incrementalDelta) {
-            ensureMessageStarted(evt.runId);
-            emittedTextContent = true;
-            emittedAssistantText += incrementalDelta;
-            emitEvent({
-              type: EventType.TEXT_MESSAGE_CONTENT,
-              messageId,
-              delta: incrementalDelta,
-            });
-          }
         }
         return;
       }
@@ -267,36 +241,11 @@ export function createOpenClawAGUIMapper(onEvent: (event: Record<string, unknown
     },
 
     onChatEvent(evt: ChatEvent) {
-      if (evt.state === "delta") {
-        // Legacy text delivery via chat.delta frames. The gateway broadcasts
-        // these as cumulative snapshots, so dedupe against what we've already
-        // emitted via the agent-stream path — otherwise both arrive on the
-        // wire for the same run and the AG-UI consumer concatenates them.
-        if (typeof evt.message === "string" && evt.message) {
-          const incoming = evt.message;
-          let incrementalDelta = incoming;
-          if (emittedAssistantText && incoming.startsWith(emittedAssistantText)) {
-            incrementalDelta = incoming.slice(emittedAssistantText.length);
-          }
-          debugLog("chat:delta->content", {
-            runId: evt.runId,
-            seq: evt.seq,
-            activeToolCallIds: [...activeToolCallIds],
-            message: incrementalDelta,
-            cumulativeDetected: incrementalDelta !== incoming,
-          });
-          if (incrementalDelta) {
-            ensureMessageStarted(evt.runId);
-            emittedTextContent = true;
-            emittedAssistantText += incrementalDelta;
-            emitEvent({
-              type: EventType.TEXT_MESSAGE_CONTENT,
-              messageId,
-              delta: incrementalDelta,
-            });
-          }
-        }
-      } else if (evt.state === "final" || evt.state === "aborted") {
+      // `chat.delta` carries cumulative snapshots of the same text that
+      // `agent.assistant` is already streaming incrementally. Listening to
+      // both produced the "GotGot it. Let me build…" tail-overlap repeat.
+      // Drop chat.delta entirely — agent.assistant is the sole text source.
+      if (evt.state === "final" || evt.state === "aborted") {
         debugLog("chat:final", {
           runId: evt.runId,
           seq: evt.seq,
@@ -315,7 +264,6 @@ export function createOpenClawAGUIMapper(onEvent: (event: Record<string, unknown
               (evt.message as { model?: unknown }).model === "gateway-injected";
             const delta = isGatewayInjected ? `${GATEWAY_SENTINEL}${finalText}` : finalText;
             emittedTextContent = true;
-            emittedAssistantText += finalText;
             emitEvent({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta });
           }
         }

@@ -42,6 +42,9 @@ next-env.d.ts
 dist/
 build/
 
+# claw-client static export bundled into claw-plugin by `pnpm bundle-ui`
+packages/claw-plugin/static/
+
 # TypeScript
 *.tsbuildinfo
 .tsbuildinfo

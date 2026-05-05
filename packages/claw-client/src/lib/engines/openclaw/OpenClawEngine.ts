@@ -252,9 +252,12 @@ export class OpenClawEngine implements Engine {
   readonly artifacts: ArtifactStore = {
     listArtifacts: async (kind?: string): Promise<ArtifactSummary[]> => {
       try {
-        const result = await this._request<{ artifacts: ArtifactSummary[] }>("artifacts.list", {
-          kind,
-        });
+        const result = await this._request<{ artifacts: ArtifactSummary[] }>(
+          "openclawos.artifacts.list",
+          {
+            kind,
+          },
+        );
         return result?.artifacts ?? [];
       } catch (error) {
         warn("artifacts.list failed:", error);
@@ -264,9 +267,12 @@ export class OpenClawEngine implements Engine {
 
     getArtifact: async (artifactId: string): Promise<ArtifactRecord | null> => {
       try {
-        const result = await this._request<{ artifact: ArtifactRecord | null }>("artifacts.get", {
-          id: artifactId,
-        });
+        const result = await this._request<{ artifact: ArtifactRecord | null }>(
+          "openclawos.artifacts.get",
+          {
+            id: artifactId,
+          },
+        );
         return result?.artifact ?? null;
       } catch (error) {
         warn("artifacts.get failed:", error);
@@ -275,14 +281,14 @@ export class OpenClawEngine implements Engine {
     },
 
     deleteArtifact: async (artifactId: string): Promise<void> => {
-      await this._request("artifacts.delete", { id: artifactId });
+      await this._request("openclawos.artifacts.delete", { id: artifactId });
     },
   };
 
   readonly apps: AppStore = {
     listApps: async (): Promise<AppSummary[]> => {
       try {
-        const result = await this._request<{ apps: AppSummary[] }>("apps.list", {});
+        const result = await this._request<{ apps: AppSummary[] }>("openclawos.apps.list", {});
         return result?.apps ?? [];
       } catch (error) {
         warn("apps.list failed:", error);
@@ -292,7 +298,9 @@ export class OpenClawEngine implements Engine {
 
     getApp: async (appId: string): Promise<AppRecord | null> => {
       try {
-        const result = await this._request<{ app: AppRecord | null }>("apps.get", { id: appId });
+        const result = await this._request<{ app: AppRecord | null }>("openclawos.apps.get", {
+          id: appId,
+        });
         return result?.app ?? null;
       } catch (error) {
         warn("apps.get failed:", error);
@@ -301,7 +309,7 @@ export class OpenClawEngine implements Engine {
     },
 
     deleteApp: async (appId: string): Promise<void> => {
-      await this._request("apps.delete", { id: appId });
+      await this._request("openclawos.apps.delete", { id: appId });
     },
 
     invokeTool: async (
@@ -309,7 +317,7 @@ export class OpenClawEngine implements Engine {
       args: Record<string, unknown>,
       sessionKey?: string,
     ): Promise<unknown> => {
-      const result = await this._request<{ result: unknown }>("tools.invoke", {
+      const result = await this._request<{ result: unknown }>("openclawos.tools.invoke", {
         tool_name: tool,
         tool_args: args,
         ...(sessionKey ? { sessionKey } : {}),
@@ -321,7 +329,10 @@ export class OpenClawEngine implements Engine {
   readonly uploads: UploadStore = {
     putUpload: async (params): Promise<UploadMeta | null> => {
       try {
-        const result = await this._request<{ upload: UploadMeta }>("uploads.put", params);
+        const result = await this._request<{ upload: UploadMeta }>(
+          "openclawos.uploads.put",
+          params,
+        );
         return result?.upload ?? null;
       } catch (error) {
         warn("uploads.put failed:", error);
@@ -332,7 +343,7 @@ export class OpenClawEngine implements Engine {
     listUploads: async (sessionKey?: string): Promise<UploadMeta[]> => {
       try {
         const result = await this._request<{ uploads: UploadMeta[] }>(
-          "uploads.list",
+          "openclawos.uploads.list",
           sessionKey ? { sessionKey } : {},
         );
         return result?.uploads ?? [];
@@ -344,7 +355,10 @@ export class OpenClawEngine implements Engine {
 
     getUpload: async (id: string): Promise<UploadRecord | null> => {
       try {
-        const result = await this._request<{ upload: UploadRecord | null }>("uploads.get", { id });
+        const result = await this._request<{ upload: UploadRecord | null }>(
+          "openclawos.uploads.get",
+          { id },
+        );
         return result?.upload ?? null;
       } catch (error) {
         warn("uploads.get failed:", error);
@@ -354,7 +368,7 @@ export class OpenClawEngine implements Engine {
 
     deleteUpload: async (id: string): Promise<void> => {
       try {
-        await this._request("uploads.delete", { id });
+        await this._request("openclawos.uploads.delete", { id });
       } catch (error) {
         warn("uploads.delete failed:", error);
       }
@@ -674,11 +688,11 @@ export class OpenClawEngine implements Engine {
     }
 
     try {
-      const result = await this._request<NotificationsListResult>("notifications.list");
+      const result = await this._request<NotificationsListResult>("openclawos.notifications.list");
       this.notificationMethodState = "supported";
       return result?.notifications ?? [];
     } catch (e) {
-      if (this.isUnknownMethodError(e, "notifications.list")) {
+      if (this.isUnknownMethodError(e, "openclawos.notifications.list")) {
         this.notificationMethodState = "unsupported";
         warn("notifications.list unavailable on the current gateway runtime");
         return [];
@@ -694,13 +708,13 @@ export class OpenClawEngine implements Engine {
     }
 
     try {
-      await this._request("notifications.read", {
+      await this._request("openclawos.notifications.read", {
         ...(ids && ids.length > 0 ? { ids } : {}),
       });
       this.notificationMethodState = "supported";
       return true;
     } catch (e) {
-      if (this.isUnknownMethodError(e, "notifications.read")) {
+      if (this.isUnknownMethodError(e, "openclawos.notifications.read")) {
         this.notificationMethodState = "unsupported";
         warn("notifications.read unavailable on the current gateway runtime");
         return false;
@@ -718,11 +732,11 @@ export class OpenClawEngine implements Engine {
     }
 
     try {
-      await this._request("notifications.upsert", notification);
+      await this._request("openclawos.notifications.upsert", notification);
       this.notificationMethodState = "supported";
       return true;
     } catch (e) {
-      if (this.isUnknownMethodError(e, "notifications.upsert")) {
+      if (this.isUnknownMethodError(e, "openclawos.notifications.upsert")) {
         this.notificationMethodState = "unsupported";
         warn("notifications.upsert unavailable on the current gateway runtime");
         return false;
@@ -1203,7 +1217,7 @@ export class OpenClawEngine implements Engine {
     });
     // Best-effort cleanup of uploads bound to this session.
     try {
-      await this._request("uploads.deleteBySession", { sessionKey });
+      await this._request("openclawos.uploads.deleteBySession", { sessionKey });
     } catch (error) {
       warn("uploads.deleteBySession failed:", error);
     }

@@ -1,10 +1,29 @@
 {
   "name": "@openuidev/openclaw-os-plugin",
   "version": "0.1.1",
-  "private": true,
-  "main": "./src/index.ts",
+  "type": "module",
+  "description": "OpenClaw plugin that turns agent responses into Generative UI and serves the claw-client at /plugins/openclawos.",
+  "license": "MIT",
+  "homepage": "https://openui.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thesysdev/openclaw-ui.git",
+    "directory": "packages/claw-plugin"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "static",
+    "skills",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
   "scripts": {
     "generate": "tsx generate-prompt.ts",
+    "build": "rm -rf dist && esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index.js --external:openclaw --external:openclaw/* --external:node:* --loader:.json=json --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "bundle-ui": "cd ../claw-client && pnpm install --frozen-lockfile=false && pnpm build && rm -rf ../claw-plugin/static && cp -r out ../claw-plugin/static",
+    "prepack": "pnpm generate && pnpm bundle-ui && pnpm build",
+    "open": "node ../../scripts/open-ui.mjs",
     "lint:check": "eslint ./src",
     "lint:fix": "eslint ./src --fix",
     "format:check": "prettier --check ./src",
@@ -17,11 +36,12 @@
     "@openuidev/lang-core": "^0.2.2"
   },
   "peerDependencies": {
-    "openclaw": "*"
+    "openclaw": ">=2026.4.12"
   },
   "devDependencies": {
     "@openuidev/react-ui": "*",
     "@types/node": "^22.19.15",
+    "esbuild": "^0.25.0",
     "openclaw": "*",
     "tsx": "^4.0.0",
     "typescript": "^5.9.3",
@@ -29,7 +49,15 @@
   },
   "openclaw": {
     "extensions": [
-      "./src/index.ts"
-    ]
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.4.12",
+      "minGatewayVersion": "2026.4.12"
+    },
+    "build": {
+      "openclawVersion": "2026.4.12",
+      "pluginSdkVersion": "2026.4.12"
+    }
   }
 }

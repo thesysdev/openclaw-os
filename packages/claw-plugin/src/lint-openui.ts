@@ -6,7 +6,7 @@ import {
   type ParseResult,
   type Parser,
 } from "@openuidev/lang-core";
-import schemaJson from "./generated/openui-schema.json";
+import schemaJson from "./generated/openui-schema.json" with { type: "json" };
 
 // `openui-schema.json` ships `{schema, componentNames}` — the JSON Schema
 // emitted by `openuiLibrary.toJSONSchema()` plus a flat list of component

@@ -3,6 +3,20 @@
   "name": "Claw — OpenUI for OpenClaw",
   "description": "Enables Generative UI in the Claw client by injecting the OpenUI Lang system prompt for direct WebSocket chat sessions.",
   "version": "0.1.1",
+  "enabledByDefault": true,
+  "contracts": {
+    "tools": [
+      "create_markdown_artifact",
+      "update_markdown_artifact",
+      "get_artifact",
+      "list_artifacts",
+      "db_query",
+      "db_execute",
+      "app_create",
+      "get_app",
+      "app_update"
+    ]
+  },
   "skills": ["./skills"],
   "configSchema": {
     "jsonSchema": {

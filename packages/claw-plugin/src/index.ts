@@ -1,17 +1,23 @@
 import { mergeStatements } from "@openuidev/lang-core";
-import { mkdir } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { mkdir, stat } from "node:fs/promises";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { fileURLToPath } from "node:url";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
 import type {
   GatewayRequestHandlerOptions,
   OpenClawPluginToolContext,
 } from "openclaw/plugin-sdk/core";
 import { definePluginEntry, emptyPluginConfigSchema } from "openclaw/plugin-sdk/plugin-entry";
-import { AppStore } from "./app-store";
-import { ArtifactStore } from "./artifact-store";
-import { lintOpenUICode, type LintReport } from "./lint-openui";
-import { NotificationStore } from "./notification-store";
-import { UploadStore } from "./upload-store";
+import { AppStore } from "./app-store.js";
+import { ArtifactStore } from "./artifact-store.js";
+import { lintOpenUICode, type LintReport } from "./lint-openui.js";
+import { NotificationStore } from "./notification-store.js";
+import { UploadStore } from "./upload-store.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Tiny preamble injected into Claw sessions. Tells the agent that
@@ -58,8 +64,6 @@ When the composer text starts with \`Refine app "..." (id: ...)\` or \`Refine ar
 ## The bottom line
 
 Default to plain text only when a visual would be pure decoration. The moment a request smells like data, comparison, structured input, long output, or a recurring surface — read the relevant skill and render UI. Never explain that you can render UI. Just do it.`;
-
-const { jsonResult } = require("openclaw/plugin-sdk/core") as any;
 
 function sanitizeDbSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "_");
@@ -126,6 +130,113 @@ export default definePluginEntry({
 
   register(api) {
     api.logger.info("[openclaw-os-plugin] register() called — plugin loaded OK");
+
+    // ── Static UI route ─────────────────────────────────────────────────────
+    // Serves the claw-client static export bundled into ../static/ at install
+    // time. Authentication is the user's responsibility: open the URL with
+    // #gateway=...&token=... in the fragment (see scripts/open-ui.mjs).
+    const STATIC_ROOT = path.resolve(__dirname, "..", "static");
+    const ROUTE_PREFIX = "/plugins/openclawos";
+    const MIME_TYPES: Record<string, string> = {
+      ".html": "text/html; charset=utf-8",
+      ".js": "application/javascript; charset=utf-8",
+      ".mjs": "application/javascript; charset=utf-8",
+      ".css": "text/css; charset=utf-8",
+      ".json": "application/json; charset=utf-8",
+      ".map": "application/json; charset=utf-8",
+      ".svg": "image/svg+xml",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif": "image/gif",
+      ".webp": "image/webp",
+      ".ico": "image/x-icon",
+      ".woff": "font/woff",
+      ".woff2": "font/woff2",
+      ".ttf": "font/ttf",
+      ".txt": "text/plain; charset=utf-8",
+    };
+
+    const serveFile = (res: ServerResponse, absPath: string): void => {
+      const ext = path.extname(absPath).toLowerCase();
+      const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
+      res.writeHead(200, {
+        "Content-Type": contentType,
+        "Cache-Control": ext === ".html" ? "no-cache" : "public, max-age=3600",
+      });
+      createReadStream(absPath)
+        .on("error", (err) => {
+          api.logger.warn(`[openclaw-ui-plugin] static stream error ${absPath}: ${err}`);
+          if (!res.headersSent) {
+            res.writeHead(500);
+          }
+          res.end();
+        })
+        .pipe(res);
+    };
+
+    const tryServe = async (res: ServerResponse, candidate: string): Promise<boolean> => {
+      try {
+        const stats = await stat(candidate);
+        if (stats.isFile()) {
+          serveFile(res, candidate);
+          return true;
+        }
+      } catch {
+        // Falls through to next candidate.
+      }
+      return false;
+    };
+
+    api.registerHttpRoute({
+      path: ROUTE_PREFIX,
+      auth: "plugin",
+      match: "prefix",
+      handler: async (req: IncomingMessage, res: ServerResponse) => {
+        const rawUrl = req.url ?? "/";
+        const urlPath = rawUrl.split("?")[0]!.split("#")[0]!;
+        // Strip the route prefix so /plugins/openclawos/_next/x → /_next/x
+        let relPath = urlPath.startsWith(ROUTE_PREFIX)
+          ? urlPath.slice(ROUTE_PREFIX.length)
+          : urlPath;
+        if (relPath === "" || relPath === "/") {
+          relPath = "/index.html";
+        }
+
+        // Decode + normalize, then guard against path traversal.
+        let safeRel: string;
+        try {
+          safeRel = decodeURIComponent(relPath);
+        } catch {
+          res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Bad Request");
+          return true;
+        }
+        const absPath = path.join(STATIC_ROOT, safeRel);
+        const normalizedRoot = path.resolve(STATIC_ROOT) + path.sep;
+        if (!path.resolve(absPath).startsWith(normalizedRoot.slice(0, -1))) {
+          res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Forbidden");
+          return true;
+        }
+
+        // 1) Direct file hit (incl. /index.html, /_next/static/*, /favicon.ico).
+        if (await tryServe(res, absPath)) return true;
+        // 2) Next.js static export emits clean paths like /setup → setup.html.
+        if (await tryServe(res, absPath + ".html")) return true;
+        // 3) Directory with index.html (e.g. /setup/ → /setup/index.html).
+        if (await tryServe(res, path.join(absPath, "index.html"))) return true;
+        // 4) SPA fallback so client-side routing on the loaded app still works.
+        if (await tryServe(res, path.join(STATIC_ROOT, "index.html"))) return true;
+
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Not Found");
+        return true;
+      },
+    });
+    api.logger.info(
+      `[openclaw-ui-plugin] static UI route at ${ROUTE_PREFIX} (root=${STATIC_ROOT})`,
+    );
 
     // ── Tiny preamble injection ──────────────────────────────────────────────
     // The agent fetches the actual openui-lang prompt body via `read` on the
@@ -560,8 +671,15 @@ export default definePluginEntry({
     // Gateway RPC `params` is `Record<string, unknown>` (arbitrary JSON),
     // so reads use bracket access to satisfy `noPropertyAccessFromIndexSignature`.
     // Each field is still narrowed with a `typeof` check before use.
+    //
+    // Namespaced under `openclawos.*` because openclaw 2026.5.x ships a built-in
+    // `artifacts.list/get/download` that returns *transcript-derived media
+    // artifacts* scoped to sessionKey/runId/taskId — a different concept from
+    // this plugin's user-saved markdown documents. The core method takes
+    // priority over plugin handlers, so the plugin must use a non-colliding
+    // name. See: openclaw/docs/gateway/protocol.md ("artifacts.list…").
     api.registerGatewayMethod(
-      "artifacts.list",
+      "openclawos.artifacts.list",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const kind = typeof params["kind"] === "string" ? params["kind"] : undefined;
@@ -590,7 +708,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "artifacts.get",
+      "openclawos.artifacts.get",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const id = typeof params["id"] === "string" ? params["id"] : "";
@@ -617,7 +735,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "artifacts.delete",
+      "openclawos.artifacts.delete",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const id = typeof params["id"] === "string" ? params["id"] : "";
@@ -634,29 +752,32 @@ export default definePluginEntry({
 
     // ── App gateway RPC methods ──────────────────────────────────────────────
 
-    api.registerGatewayMethod("apps.list", async ({ respond }: GatewayRequestHandlerOptions) => {
-      try {
-        const apps = await getAppStore().list();
-        respond(true, {
-          apps: apps.map((a) => ({
-            id: a.id,
-            title: a.title,
-            agentId: a.agentId,
-            sessionKey: a.sessionKey,
-            createdAt: a.createdAt,
-            updatedAt: a.updatedAt,
-          })),
-        });
-      } catch (e) {
-        respond(false, undefined, {
-          message: e instanceof Error ? e.message : "Failed to list apps",
-          code: "apps.list_failed",
-        });
-      }
-    });
+    api.registerGatewayMethod(
+      "openclawos.apps.list",
+      async ({ respond }: GatewayRequestHandlerOptions) => {
+        try {
+          const apps = await getAppStore().list();
+          respond(true, {
+            apps: apps.map((a) => ({
+              id: a.id,
+              title: a.title,
+              agentId: a.agentId,
+              sessionKey: a.sessionKey,
+              createdAt: a.createdAt,
+              updatedAt: a.updatedAt,
+            })),
+          });
+        } catch (e) {
+          respond(false, undefined, {
+            message: e instanceof Error ? e.message : "Failed to list apps",
+            code: "apps.list_failed",
+          });
+        }
+      },
+    );
 
     api.registerGatewayMethod(
-      "apps.get",
+      "openclawos.apps.get",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const id = typeof params["id"] === "string" ? params["id"] : "";
@@ -672,7 +793,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "apps.delete",
+      "openclawos.apps.delete",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const id = typeof params["id"] === "string" ? params["id"] : "";
@@ -688,7 +809,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "apps.versions",
+      "openclawos.apps.versions",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const id = typeof params["id"] === "string" ? params["id"] : "";
@@ -717,7 +838,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "apps.restore",
+      "openclawos.apps.restore",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const id = typeof params["id"] === "string" ? params["id"] : "";
@@ -734,7 +855,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "uploads.put",
+      "openclawos.uploads.put",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const sessionKey = typeof params["sessionKey"] === "string" ? params["sessionKey"] : "";
@@ -764,7 +885,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "uploads.list",
+      "openclawos.uploads.list",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const sessionKey =
@@ -781,7 +902,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "uploads.get",
+      "openclawos.uploads.get",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const id = typeof params["id"] === "string" ? params["id"] : "";
@@ -804,7 +925,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "uploads.delete",
+      "openclawos.uploads.delete",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const id = typeof params["id"] === "string" ? params["id"] : "";
@@ -820,7 +941,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "uploads.deleteBySession",
+      "openclawos.uploads.deleteBySession",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const sessionKey = typeof params["sessionKey"] === "string" ? params["sessionKey"] : "";
@@ -843,7 +964,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "notifications.list",
+      "openclawos.notifications.list",
       async ({ respond }: GatewayRequestHandlerOptions) => {
         try {
           const notifications = await getNotificationStore().list();
@@ -858,7 +979,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "notifications.read",
+      "openclawos.notifications.read",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const ids = Array.isArray(params["ids"])
@@ -876,7 +997,7 @@ export default definePluginEntry({
     );
 
     api.registerGatewayMethod(
-      "notifications.upsert",
+      "openclawos.notifications.upsert",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         try {
           const kind = params["kind"];
@@ -945,12 +1066,16 @@ export default definePluginEntry({
         const stderr = (result.stderr ?? "").trim();
         const exitCode = result.code ?? 0;
 
-        // Auto-parse stdout as JSON so apps get clean data objects.
-        if (exitCode === 0 && stdout) {
+        // Auto-parse stdout as JSON so apps get clean data objects — but only
+        // when the output looks like a JSON object or array. Bare numbers and
+        // strings (e.g. `date +%s` → `1777925583`) parse successfully too,
+        // which would replace the result with a primitive and break Query
+        // bindings like `now.stdout` in openui-lang. Restrict to {…} / […].
+        if (exitCode === 0 && stdout && (stdout[0] === "{" || stdout[0] === "[")) {
           try {
             return JSON.parse(stdout);
           } catch {
-            // Not valid JSON — return raw output.
+            // Not valid JSON — fall through to the raw shape below.
           }
         }
         return { stdout, stderr, exitCode };
@@ -996,8 +1121,16 @@ export default definePluginEntry({
       }
     };
 
+    // Namespaced under `openclawos.*` because openclaw 2026.5.x ships a built-in
+    // `tools.invoke` (param shape `{ name, args }`, not the legacy
+    // `{ tool_name, tool_args }`). Registering the same name from a plugin
+    // logs `gateway method already registered: tools.invoke` and destabilises
+    // plugin tool runtime resolution — symptom: agent `app_create` fails
+    // with "plugin tool runtime missing" while peer tools keep working in
+    // the same session. Rendered apps' Query/Mutation calls use this
+    // namespaced RPC; the gateway core built-in is left alone.
     api.registerGatewayMethod(
-      "tools.invoke",
+      "openclawos.tools.invoke",
       async ({ params, respond }: GatewayRequestHandlerOptions) => {
         const toolName = typeof params["tool_name"] === "string" ? params["tool_name"] : "";
         const toolArgs =

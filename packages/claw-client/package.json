@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev --port 18790",
-    "start": "next start --port 18790",
+    "dev": "NEXT_OUTPUT=server next dev --port 18790",
+    "start": "NEXT_OUTPUT=server next start --port 18790",
     "lint:check": "eslint ./src",
     "lint:fix": "eslint ./src --fix",
     "format:check": "prettier --check ./src",

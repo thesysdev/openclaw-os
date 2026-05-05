@@ -259,7 +259,7 @@ export function HomeView({
                     </Button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-x-xl sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-x-xl xl:grid-cols-2">
                     {recentApps.slice(0, 6).map((app) => (
                       <HomeRow
                         key={app.id}
