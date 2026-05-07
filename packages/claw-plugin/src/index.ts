@@ -427,279 +427,306 @@ export default definePluginEntry({
 
     api.logger.info("[openclaw-os-plugin] registering tools…");
 
-    api.registerTool((ctx: OpenClawPluginToolContext) => ({
-      name: "create_markdown_artifact",
-      label: "Create Markdown Artifact",
-      description:
-        "Create a durable markdown document artifact that the user can view and revisit in the Artifacts panel. Use for reports, summaries, plans, reference material, or any structured text worth preserving.",
-      parameters: {
-        type: "object" as const,
-        properties: {
-          title: { type: "string", description: "Short, descriptive title for the artifact" },
-          content: { type: "string", description: "Full markdown content of the document" },
-        },
-        required: ["title", "content"],
-      },
-      execute: async (_id: string, params: { title: string; content: string }) => {
-        const artifact = await getStore().create({
-          kind: "markdown",
-          title: params.title,
-          content: params.content,
-          source: {
-            agentId: ctx.agentId ?? "unknown",
-            sessionKey: ctx.sessionKey ?? "unknown",
+    api.registerTool(
+      (ctx: OpenClawPluginToolContext) => ({
+        name: "create_markdown_artifact",
+        label: "Create Markdown Artifact",
+        description:
+          "Create a durable markdown document artifact that the user can view and revisit in the Artifacts panel. Use for reports, summaries, plans, reference material, or any structured text worth preserving.",
+        parameters: {
+          type: "object" as const,
+          properties: {
+            title: { type: "string", description: "Short, descriptive title for the artifact" },
+            content: { type: "string", description: "Full markdown content of the document" },
           },
-        });
-        return jsonResult({
-          id: artifact.id,
-          title: artifact.title,
-          createdAt: artifact.createdAt,
-        });
-      },
-    }));
+          required: ["title", "content"],
+        },
+        execute: async (_id: string, params: { title: string; content: string }) => {
+          const artifact = await getStore().create({
+            kind: "markdown",
+            title: params.title,
+            content: params.content,
+            source: {
+              agentId: ctx.agentId ?? "unknown",
+              sessionKey: ctx.sessionKey ?? "unknown",
+            },
+          });
+          return jsonResult({
+            id: artifact.id,
+            title: artifact.title,
+            createdAt: artifact.createdAt,
+          });
+        },
+      }),
+      { name: "create_markdown_artifact" },
+    );
 
-    api.registerTool((_ctx: OpenClawPluginToolContext) => ({
-      name: "update_markdown_artifact",
-      label: "Update Markdown Artifact",
-      description:
-        "Update the title and/or content of an existing markdown artifact by its id. Call get_artifact first if you need to read the current content before editing.",
-      parameters: {
-        type: "object" as const,
-        properties: {
-          id: { type: "string", description: "The artifact id" },
-          title: { type: "string", description: "New title (optional — omit to keep current)" },
-          content: {
-            type: "string",
-            description: "New markdown content (optional — omit to keep current)",
+    api.registerTool(
+      (_ctx: OpenClawPluginToolContext) => ({
+        name: "update_markdown_artifact",
+        label: "Update Markdown Artifact",
+        description:
+          "Update the title and/or content of an existing markdown artifact by its id. Call get_artifact first if you need to read the current content before editing.",
+        parameters: {
+          type: "object" as const,
+          properties: {
+            id: { type: "string", description: "The artifact id" },
+            title: { type: "string", description: "New title (optional — omit to keep current)" },
+            content: {
+              type: "string",
+              description: "New markdown content (optional — omit to keep current)",
+            },
           },
+          required: ["id"],
         },
-        required: ["id"],
-      },
-      execute: async (_id: string, params: { id: string; title?: string; content?: string }) => {
-        const artifact = await getStore().update(params.id, {
-          ...(params.title !== undefined ? { title: params.title } : {}),
-          ...(params.content !== undefined ? { content: params.content } : {}),
-        });
-        return jsonResult({ id: artifact.id, updatedAt: artifact.updatedAt });
-      },
-    }));
+        execute: async (_id: string, params: { id: string; title?: string; content?: string }) => {
+          const artifact = await getStore().update(params.id, {
+            ...(params.title !== undefined ? { title: params.title } : {}),
+            ...(params.content !== undefined ? { content: params.content } : {}),
+          });
+          return jsonResult({ id: artifact.id, updatedAt: artifact.updatedAt });
+        },
+      }),
+      { name: "update_markdown_artifact" },
+    );
 
-    api.registerTool(() => ({
-      name: "get_artifact",
-      label: "Get Artifact By Id",
-      description: "Fetch the full content of an artifact by id.",
-      parameters: {
-        type: "object" as const,
-        properties: {
-          id: { type: "string", description: "The artifact id" },
+    api.registerTool(
+      () => ({
+        name: "get_artifact",
+        label: "Get Artifact By Id",
+        description: "Fetch the full content of an artifact by id.",
+        parameters: {
+          type: "object" as const,
+          properties: {
+            id: { type: "string", description: "The artifact id" },
+          },
+          required: ["id"],
         },
-        required: ["id"],
-      },
-      execute: async (_id: string, params: { id: string }) => {
-        const artifact = await getStore().get(params.id);
-        if (!artifact) return jsonResult({ error: "Artifact not found", id: params.id });
-        return jsonResult({
-          id: artifact.id,
-          kind: artifact.kind,
-          title: artifact.title,
-          content: artifact.content,
-        });
-      },
-    }));
+        execute: async (_id: string, params: { id: string }) => {
+          const artifact = await getStore().get(params.id);
+          if (!artifact) return jsonResult({ error: "Artifact not found", id: params.id });
+          return jsonResult({
+            id: artifact.id,
+            kind: artifact.kind,
+            title: artifact.title,
+            content: artifact.content,
+          });
+        },
+      }),
+      { name: "get_artifact" },
+    );
 
-    api.registerTool(() => ({
-      name: "list_artifacts",
-      label: "List Artifacts",
-      description: "List existing artifacts, optionally filtered by kind.",
-      parameters: {
-        type: "object" as const,
-        properties: {
-          kind: {
-            type: "string",
-            description: "Filter by kind (e.g. 'markdown'). Omit to list all.",
+    api.registerTool(
+      () => ({
+        name: "list_artifacts",
+        label: "List Artifacts",
+        description: "List existing artifacts, optionally filtered by kind.",
+        parameters: {
+          type: "object" as const,
+          properties: {
+            kind: {
+              type: "string",
+              description: "Filter by kind (e.g. 'markdown'). Omit to list all.",
+            },
           },
         },
-      },
-      execute: async (_id: string, params: { kind?: string }) => {
-        const items = await getStore().list(
-          typeof params.kind === "string" ? params.kind : undefined,
-        );
-        return jsonResult(
-          items.map((a) => ({
-            id: a.id,
-            kind: a.kind,
-            title: a.title,
-            createdAt: a.createdAt,
-            updatedAt: a.updatedAt,
-          })),
-        );
-      },
-    }));
+        execute: async (_id: string, params: { kind?: string }) => {
+          const items = await getStore().list(
+            typeof params.kind === "string" ? params.kind : undefined,
+          );
+          return jsonResult(
+            items.map((a) => ({
+              id: a.id,
+              kind: a.kind,
+              title: a.title,
+              createdAt: a.createdAt,
+              updatedAt: a.updatedAt,
+            })),
+          );
+        },
+      }),
+      { name: "list_artifacts" },
+    );
 
-    api.registerTool(() => ({
-      name: "db_query",
-      label: "Query Persistent App DB",
-      description:
-        "Run a read-only SQLite query against the persistent session-scoped app database. Returns { rows: [...] }. Use for app state such as todos, saved items, or user preferences.",
-      parameters: {
-        type: "object" as const,
-        properties: {
-          sql: {
-            type: "string",
-            description: "Read-only SQL to execute (SELECT / WITH / PRAGMA / EXPLAIN).",
+    api.registerTool(
+      () => ({
+        name: "db_query",
+        label: "Query Persistent App DB",
+        description:
+          "Run a read-only SQLite query against the persistent session-scoped app database. Returns { rows: [...] }. Use for app state such as todos, saved items, or user preferences.",
+        parameters: {
+          type: "object" as const,
+          properties: {
+            sql: {
+              type: "string",
+              description: "Read-only SQL to execute (SELECT / WITH / PRAGMA / EXPLAIN).",
+            },
+            params: {
+              type: "object" as const,
+              additionalProperties: true,
+              description:
+                "Optional named-parameter object for the SQL statement, e.g. { text: 'Buy milk' } used with $text placeholders.",
+            },
+            namespace: {
+              type: "string",
+              description:
+                "Optional logical database name within the current session. Defaults to 'default'.",
+            },
           },
-          params: {
-            type: "object" as const,
-            additionalProperties: true,
-            description:
-              "Optional named-parameter object for the SQL statement, e.g. { text: 'Buy milk' } used with $text placeholders.",
-          },
-          namespace: {
-            type: "string",
-            description:
-              "Optional logical database name within the current session. Defaults to 'default'.",
-          },
+          required: ["sql"],
         },
-        required: ["sql"],
-      },
-      execute: async (_callId: string, params: Record<string, unknown>) =>
-        jsonResult(await invokeDbQueryTool(params)),
-    }));
+        execute: async (_callId: string, params: Record<string, unknown>) =>
+          jsonResult(await invokeDbQueryTool(params)),
+      }),
+      { name: "db_query" },
+    );
 
-    api.registerTool(() => ({
-      name: "db_execute",
-      label: "Write Persistent App DB",
-      description:
-        "Run a write or schema SQLite statement against the persistent session-scoped app database. Returns { changes, lastInsertRowid }. Use for CREATE TABLE, INSERT, UPDATE, or DELETE.",
-      parameters: {
-        type: "object" as const,
-        properties: {
-          sql: {
-            type: "string",
-            description: "SQL statement to execute. Use params for dynamic values when possible.",
+    api.registerTool(
+      () => ({
+        name: "db_execute",
+        label: "Write Persistent App DB",
+        description:
+          "Run a write or schema SQLite statement against the persistent session-scoped app database. Returns { changes, lastInsertRowid }. Use for CREATE TABLE, INSERT, UPDATE, or DELETE.",
+        parameters: {
+          type: "object" as const,
+          properties: {
+            sql: {
+              type: "string",
+              description: "SQL statement to execute. Use params for dynamic values when possible.",
+            },
+            params: {
+              type: "object" as const,
+              additionalProperties: true,
+              description:
+                "Optional named-parameter object for a single prepared statement, e.g. { text: 'Buy milk' } used with $text placeholders.",
+            },
+            namespace: {
+              type: "string",
+              description:
+                "Optional logical database name within the current session. Defaults to 'default'.",
+            },
           },
-          params: {
-            type: "object" as const,
-            additionalProperties: true,
-            description:
-              "Optional named-parameter object for a single prepared statement, e.g. { text: 'Buy milk' } used with $text placeholders.",
-          },
-          namespace: {
-            type: "string",
-            description:
-              "Optional logical database name within the current session. Defaults to 'default'.",
-          },
+          required: ["sql"],
         },
-        required: ["sql"],
-      },
-      execute: async (_callId: string, params: Record<string, unknown>) =>
-        jsonResult(await invokeDbExecuteTool(params)),
-    }));
+        execute: async (_callId: string, params: Record<string, unknown>) =>
+          jsonResult(await invokeDbExecuteTool(params)),
+      }),
+      { name: "db_execute" },
+    );
 
     // ── App tools — direct storage, no subagent ─────────────────────────────
 
-    api.registerTool((ctx: OpenClawPluginToolContext) => ({
-      name: "app_create",
-      label: "Create App",
-      description:
-        "Create a live interactive app. Pass the complete openui-lang code. The app is stored and rendered in the Apps panel. Use when the user asks to build a dashboard, app, or interactive view.",
-      parameters: {
-        type: "object" as const,
-        properties: {
-          title: { type: "string", description: "Short display title for the app" },
-          code: { type: "string", description: "Complete openui-lang source code for the app" },
-        },
-        required: ["title", "code"],
-      },
-      execute: async (_callId: string, params: { title: string; code: string }) => {
-        api.logger.info(
-          `[openclaw-os-plugin] app_create: title="${params.title}" code=${params.code.length} chars`,
-        );
-        const lint = lintOpenUICode(params.code);
-        if (!lint.ok) {
-          api.logger.info(
-            `[openclaw-os-plugin] app_create lint: ${lint.findings.length} finding(s) — ${lint.summary.slice(0, 180)}`,
-          );
-        }
-        // Save unconditionally and surface lint findings back to the agent.
-        // Rejecting outright forces full-rewrite retries, which is the
-        // failure mode we're trying to avoid — small `app_update` patches
-        // are the right loop.
-        const app = await getAppStore().create({
-          title: params.title,
-          content: params.code,
-          agentId: ctx.agentId ?? "main",
-          sessionKey: ctx.sessionKey ?? "",
-        });
-        api.logger.info(`[openclaw-os-plugin] app_create → saved app ${app.id}`);
-        return jsonResult({
-          id: app.id,
-          title: app.title,
-          ...buildLintPayload(lint),
-        });
-      },
-    }));
-
-    api.registerTool(() => ({
-      name: "get_app",
-      label: "Get App",
-      description:
-        "Fetch the current openui-lang code of an app by id. Call this before app_update to see the current state.",
-      parameters: {
-        type: "object" as const,
-        properties: {
-          id: { type: "string", description: "The app id" },
-        },
-        required: ["id"],
-      },
-      execute: async (_callId: string, params: { id: string }) => {
-        const app = await getAppStore().get(params.id);
-        if (!app) return jsonResult({ error: "App not found", id: params.id });
-        return jsonResult({ id: app.id, title: app.title, content: app.content });
-      },
-    }));
-
-    api.registerTool(() => ({
-      name: "app_update",
-      label: "Update App",
-      description:
-        "Apply an incremental edit patch to an existing app. Pass ONLY changed/new openui-lang statements — the runtime merges by statement name. Call get_app first to see the current code.",
-      parameters: {
-        type: "object" as const,
-        properties: {
-          id: { type: "string", description: "The app id" },
-          patch: {
-            type: "string",
-            description: "openui-lang statements to merge (changed/new only)",
+    api.registerTool(
+      (ctx: OpenClawPluginToolContext) => ({
+        name: "app_create",
+        label: "Create App",
+        description:
+          "Create a live interactive app. Pass the complete openui-lang code. The app is stored and rendered in the Apps panel. Use when the user asks to build a dashboard, app, or interactive view.",
+        parameters: {
+          type: "object" as const,
+          properties: {
+            title: { type: "string", description: "Short display title for the app" },
+            code: { type: "string", description: "Complete openui-lang source code for the app" },
           },
+          required: ["title", "code"],
         },
-        required: ["id", "patch"],
-      },
-      execute: async (_callId: string, params: { id: string; patch: string }) => {
-        const existing = await getAppStore().get(params.id);
-        if (!existing) return jsonResult({ error: "App not found", id: params.id });
-
-        api.logger.info(
-          `[openclaw-os-plugin] app_update: id=${params.id} patch=${params.patch.length} chars`,
-        );
-
-        const merged = mergeStatements(existing.content, params.patch);
-        const lint = lintOpenUICode(merged);
-        if (!lint.ok) {
+        execute: async (_callId: string, params: { title: string; code: string }) => {
           api.logger.info(
-            `[openclaw-os-plugin] app_update lint: ${lint.findings.length} finding(s) — ${lint.summary.slice(0, 180)}`,
+            `[openclaw-os-plugin] app_create: title="${params.title}" code=${params.code.length} chars`,
           );
-        }
+          const lint = lintOpenUICode(params.code);
+          if (!lint.ok) {
+            api.logger.info(
+              `[openclaw-os-plugin] app_create lint: ${lint.findings.length} finding(s) — ${lint.summary.slice(0, 180)}`,
+            );
+          }
+          // Save unconditionally and surface lint findings back to the agent.
+          // Rejecting outright forces full-rewrite retries, which is the
+          // failure mode we're trying to avoid — small `app_update` patches
+          // are the right loop.
+          const app = await getAppStore().create({
+            title: params.title,
+            content: params.code,
+            agentId: ctx.agentId ?? "main",
+            sessionKey: ctx.sessionKey ?? "",
+          });
+          api.logger.info(`[openclaw-os-plugin] app_create → saved app ${app.id}`);
+          return jsonResult({
+            id: app.id,
+            title: app.title,
+            ...buildLintPayload(lint),
+          });
+        },
+      }),
+      { name: "app_create" },
+    );
 
-        const updated = await getAppStore().update(params.id, { content: merged });
-        api.logger.info(`[openclaw-os-plugin] app_update → updated app ${updated.id}`);
-        return jsonResult({
-          id: updated.id,
-          updatedAt: updated.updatedAt,
-          ...buildLintPayload(lint),
-        });
-      },
-    }));
+    api.registerTool(
+      () => ({
+        name: "get_app",
+        label: "Get App",
+        description:
+          "Fetch the current openui-lang code of an app by id. Call this before app_update to see the current state.",
+        parameters: {
+          type: "object" as const,
+          properties: {
+            id: { type: "string", description: "The app id" },
+          },
+          required: ["id"],
+        },
+        execute: async (_callId: string, params: { id: string }) => {
+          const app = await getAppStore().get(params.id);
+          if (!app) return jsonResult({ error: "App not found", id: params.id });
+          return jsonResult({ id: app.id, title: app.title, content: app.content });
+        },
+      }),
+      { name: "get_app" },
+    );
+
+    api.registerTool(
+      () => ({
+        name: "app_update",
+        label: "Update App",
+        description:
+          "Apply an incremental edit patch to an existing app. Pass ONLY changed/new openui-lang statements — the runtime merges by statement name. Call get_app first to see the current code.",
+        parameters: {
+          type: "object" as const,
+          properties: {
+            id: { type: "string", description: "The app id" },
+            patch: {
+              type: "string",
+              description: "openui-lang statements to merge (changed/new only)",
+            },
+          },
+          required: ["id", "patch"],
+        },
+        execute: async (_callId: string, params: { id: string; patch: string }) => {
+          const existing = await getAppStore().get(params.id);
+          if (!existing) return jsonResult({ error: "App not found", id: params.id });
+
+          api.logger.info(
+            `[openclaw-os-plugin] app_update: id=${params.id} patch=${params.patch.length} chars`,
+          );
+
+          const merged = mergeStatements(existing.content, params.patch);
+          const lint = lintOpenUICode(merged);
+          if (!lint.ok) {
+            api.logger.info(
+              `[openclaw-os-plugin] app_update lint: ${lint.findings.length} finding(s) — ${lint.summary.slice(0, 180)}`,
+            );
+          }
+
+          const updated = await getAppStore().update(params.id, { content: merged });
+          api.logger.info(`[openclaw-os-plugin] app_update → updated app ${updated.id}`);
+          return jsonResult({
+            id: updated.id,
+            updatedAt: updated.updatedAt,
+            ...buildLintPayload(lint),
+          });
+        },
+      }),
+      { name: "app_update" },
+    );
 
     api.logger.info("[openclaw-os-plugin] all tools registered");
 
