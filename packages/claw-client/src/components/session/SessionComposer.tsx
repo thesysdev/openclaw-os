@@ -375,6 +375,7 @@ export function SessionComposer({
   onAddFiles,
   onRemoveUpload,
   onUploadsSent,
+  onStop,
   commandContext,
   gatewayCommands = [],
   onDispatchGatewayCommand,
@@ -407,6 +408,14 @@ export function SessionComposer({
   onAddFiles?: (files: File[]) => void | Promise<void>;
   onRemoveUpload: (uploadId: string) => void;
   onUploadsSent: (uploadIds: string[]) => void;
+  /**
+   * User-initiated Stop. Fires alongside `cancelMessage` when the user clicks
+   * the Stop button — `cancelMessage` closes the local stream, `onStop` is
+   * the explicit gateway-side abort signal. The chat-store's AbortController
+   * also fires on thread switches, so the engine can't infer user-intent
+   * from the signal alone.
+   */
+  onStop?: () => void;
   commandContext?: () => CommandContext;
   gatewayCommands?: GatewayCommand[];
   models?: ModelChoice[];
@@ -859,7 +868,14 @@ export function SessionComposer({
               isRunning ? "Stop" : parsedCommand ? `Run /${parsedCommand.command.name}` : "Send"
             }
             disabled={!isRunning && isDisabled}
-            onClick={isRunning ? cancelMessage : () => void handleSubmit()}
+            onClick={
+              isRunning
+                ? () => {
+                    onStop?.();
+                    cancelMessage();
+                  }
+                : () => void handleSubmit()
+            }
           />
         </div>
       </div>
@@ -937,13 +953,13 @@ export function SessionComposer({
                     onChange={onModelChange}
                     title="Model"
                     options={[
-                      {
-                        value: "",
-                        // When we can identify the resolved default model, label
-                        // the row "Default (Name)". Filter that same model out of
-                        // the list below so it doesn't appear twice.
-                        label: defaultModel ? `Default (${defaultModel.name})` : "Default",
-                      },
+                      // The "" value still represents "use the resolved default"
+                      // — we just label it with the model's own name so the
+                      // list reads as a flat catalog. The default model is
+                      // filtered from the rest so it doesn't appear twice.
+                      ...(defaultModel
+                        ? [{ value: "", label: defaultModel.name, group: defaultModel.provider }]
+                        : [{ value: "", label: "Default" }]),
                       ...uniqueModels
                         .filter((m) => m !== defaultModel)
                         .map((m) => ({

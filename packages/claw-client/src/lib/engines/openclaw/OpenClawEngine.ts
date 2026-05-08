@@ -554,8 +554,20 @@ export class OpenClawEngine implements Engine {
     };
     this.runListeners.set(sessionKey, listener);
 
+    // The AbortController signal fires both on the user clicking Stop AND on
+    // ChatProvider.selectThread() when the user navigates to another thread
+    // (see react-headless dist/index.mjs:858,871 — cancelMessage is invoked
+    // unconditionally on thread switch). Auto-firing `chat.abort` here would
+    // therefore kill in-flight runs on every navigation, which (a) loses the
+    // partial response server-side and (b) causes the gateway to persist the
+    // partial as a `model: "gateway-injected"` message that re-renders as a
+    // duplicate "Gateway"-tagged bubble (history-merger.ts treats that model
+    // tag as a slash-command reply). We only close the local stream; the
+    // backend run continues server-side, completes normally, and lands in
+    // chat.history on the next reload — matching the openclaw web client's
+    // `deliver: false` fire-and-forget semantics. Explicit Stop is available
+    // via `engine.abort(sessionId)` for callers that want it.
     abortController.signal.addEventListener("abort", () => {
-      this.socket?.request("chat.abort", { sessionKey }).catch(() => {});
       closeStream();
     });
 
@@ -565,6 +577,11 @@ export class OpenClawEngine implements Engine {
         message: messageText,
         ...(attachments.length > 0 ? { attachments } : {}),
         idempotencyKey: crypto.randomUUID(),
+        // Decouple the run lifecycle from this client's subscription. The
+        // openclaw web client (ui/src/ui/controllers/chat.ts:410) does the
+        // same — it lets the gateway treat the run as internal so any future
+        // client disconnect doesn't cancel it.
+        deliver: false,
       });
     } catch (err) {
       this.runListeners.delete(sessionKey);

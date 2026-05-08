@@ -5,12 +5,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { IconButton } from "@/components/layout/sidebar/IconButton";
 import { Button } from "@/components/ui/Button";
-import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { ConnectionState } from "@/lib/gateway/types";
 import { validateGatewayUrl } from "@/lib/gateway/url";
 import type { Settings } from "@/lib/storage";
-
-import { AutomatedSetup } from "./AutomatedSetup";
 
 interface Props {
   open: boolean;
@@ -76,7 +73,7 @@ const STATUS_BANNER: Record<
   },
   [ConnectionState.AUTH_FAILED]: {
     label: "Auth failed",
-    description: "The token was rejected. Re-run `openclaw auth token`.",
+    description: "The token was rejected. Re-run `openclaw onboard` for a fresh one.",
     accent: "text-text-danger-primary",
     tileBg: "bg-danger-background",
     tileBorder: "border-border-danger/50",
@@ -92,12 +89,9 @@ const STATUS_BANNER: Record<
   },
 };
 
-type Tab = "automated" | "manual";
-
 export function SettingsDialog({ open, currentSettings, connectionState, onClose, onSave }: Props) {
   const [gatewayUrl, setGatewayUrl] = useState(currentSettings?.gatewayUrl ?? "");
   const [token, setToken] = useState(currentSettings?.token ?? "");
-  const [tab, setTab] = useState<Tab>("automated");
   // `pending` = user clicked Save & Connect and we're awaiting the engine's
   // resolution. We hold the dialog open and watch `connectionState` to decide
   // whether to close (CONNECTED) or surface an inline error (UNREACHABLE /
@@ -114,11 +108,14 @@ export function SettingsDialog({ open, currentSettings, connectionState, onClose
   //      `ws://host/#frag`). React batches both updates; the dialog only sees
   //      the final UNREACHABLE. A "must see CONNECTING first" gate gets stuck
   //      because the CONNECTING render never arrived.
-  // Solution: snapshot the connectionState that was current when the user
-  // clicked Save. Resolve only when the live state differs from that snapshot
-  // AND is terminal. This handles both races without depending on observing
-  // any specific intermediate state.
+  //   3. User clicks Save while state=CONNECTED, engine cycles
+  //      CONNECTED→CONNECTING→CONNECTED. The post-reconnect state matches the
+  //      snapshot, so a "differs from snapshot" gate would never resolve.
+  // Solution: snapshot the connectionState at submit time AND remember
+  // whether the live state has ever departed it. Once it has, any terminal
+  // state resolves — including a return-to-snapshot CONNECTED.
   const submitSnapshotRef = useRef<ConnectionState | null>(null);
+  const hasLeftSnapshotRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -129,6 +126,7 @@ export function SettingsDialog({ open, currentSettings, connectionState, onClose
     setToken(currentSettings?.token ?? "");
     setPending(false);
     submitSnapshotRef.current = null;
+    hasLeftSnapshotRef.current = false;
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]); // intentionally not depending on currentSettings — see comment above
@@ -140,26 +138,34 @@ export function SettingsDialog({ open, currentSettings, connectionState, onClose
     else el.close();
   }, [open]);
 
-  // Resolve a pending save when the connection state moves off the snapshot
-  // captured at submit time and lands on a terminal state.
+  // Resolve a pending save once we've seen the connection state depart the
+  // submit-time snapshot at least once and land on a terminal state. The
+  // "has left" latch handles a CONNECTED→CONNECTING→CONNECTED cycle that
+  // ends back where it started — without it, the second CONNECTED would
+  // hit the "still equal to snapshot" gate and never resolve.
   useEffect(() => {
     if (!pending) return;
     const snapshot = submitSnapshotRef.current;
-    // First render after submit: state may still equal snapshot. Wait.
-    if (snapshot !== null && connectionState === snapshot) return;
+    if (snapshot !== null && connectionState !== snapshot) {
+      hasLeftSnapshotRef.current = true;
+    }
+    if (snapshot !== null && !hasLeftSnapshotRef.current) return;
     if (connectionState === ConnectionState.CONNECTED) {
       setPending(false);
       submitSnapshotRef.current = null;
+      hasLeftSnapshotRef.current = false;
       setError(null);
       onClose();
     } else if (connectionState === ConnectionState.UNREACHABLE) {
       setPending(false);
       submitSnapshotRef.current = null;
+      hasLeftSnapshotRef.current = false;
       setError("Couldn't reach the gateway at that URL. Check the address and try again.");
     } else if (connectionState === ConnectionState.AUTH_FAILED) {
       setPending(false);
       submitSnapshotRef.current = null;
-      setError("Gateway rejected the auth token. Run `openclaw auth token` to get a fresh one.");
+      hasLeftSnapshotRef.current = false;
+      setError("Gateway rejected the auth token. Run `openclaw onboard` to set a fresh one.");
     }
     // CONNECTING / DISCONNECTED / PAIRING are intermediate — keep waiting.
   }, [pending, connectionState, onClose]);
@@ -186,9 +192,11 @@ export function SettingsDialog({ open, currentSettings, connectionState, onClose
     };
     setError(null);
     setPending(true);
-    // Snapshot the engine's current state — the resolver waits for it to
-    // change off this value before treating any terminal state as ours.
+    // Snapshot the engine's current state and reset the "has left" latch.
+    // The resolver waits to observe state depart this snapshot before
+    // treating a subsequent terminal state as ours.
     submitSnapshotRef.current = connectionState;
+    hasLeftSnapshotRef.current = false;
     // Engine owns the localStorage write via its onSettingsChanged callback —
     // no need to write here.
     onSave(newSettings);
@@ -234,99 +242,92 @@ export function SettingsDialog({ open, currentSettings, connectionState, onClose
           </div>
         </div>
 
-        <div className="mb-ml">
-          <SegmentedTabs<Tab>
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: "automated", label: "Automated" },
-              { value: "manual", label: "Manual" },
-            ]}
-            ariaLabel="Settings section"
-          />
-        </div>
-
         <div className="min-h-0">
-          {tab === "automated" ? <AutomatedSetup /> : null}
+          <>
+            <p className="mb-ml font-body text-md leading-snug text-text-neutral-tertiary">
+              Connect Claw to your OpenClaw gateway. The fastest way is to run{" "}
+              <code className="rounded bg-sunk-light px-3xs font-mono text-sm dark:bg-elevated">
+                openclaw os url
+              </code>{" "}
+              in a terminal — it opens this page pre-authenticated. To paste manually, open{" "}
+              <code className="rounded bg-sunk-light px-3xs font-mono text-sm dark:bg-elevated">
+                ~/.openclaw/openclaw.json
+              </code>{" "}
+              and copy <code className="font-mono">gateway.port</code> and{" "}
+              <code className="font-mono">gateway.auth.token</code>.
+            </p>
 
-          {tab === "manual" ? (
-            <>
-              <p className="mb-ml font-body text-md leading-snug text-text-neutral-tertiary">
-                Connect Claw to your OpenClaw gateway. Run{" "}
-                <code className="rounded bg-sunk-light px-3xs font-mono text-sm dark:bg-elevated">
-                  openclaw config show
-                </code>{" "}
-                in a terminal to see your gateway URL and token.
-              </p>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-l">
+              <div className="flex flex-col gap-xs">
+                <label className="font-label text-sm font-medium text-text-neutral-secondary">
+                  Gateway URL
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="ws://localhost:18789"
+                  value={gatewayUrl}
+                  onChange={(e) => setGatewayUrl(e.target.value)}
+                  disabled={pending}
+                  className="rounded-lg border border-border-default bg-background px-m py-s font-body text-md text-text-neutral-primary outline-none focus:border-border-interactive-emphasis disabled:opacity-60 dark:border-border-default/16 dark:bg-foreground"
+                />
+                <p className="font-body text-sm text-text-neutral-tertiary">
+                  Use <code className="font-mono">ws://</code> for local,{" "}
+                  <code className="font-mono">wss://</code> for remote.
+                </p>
+              </div>
 
-              <form onSubmit={handleSubmit} className="flex flex-col gap-l">
-                <div className="flex flex-col gap-xs">
-                  <label className="font-label text-sm font-medium text-text-neutral-secondary">
-                    Gateway URL
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    placeholder="ws://localhost:18789"
-                    value={gatewayUrl}
-                    onChange={(e) => setGatewayUrl(e.target.value)}
-                    disabled={pending}
-                    className="rounded-lg border border-border-default bg-background px-m py-s font-body text-md text-text-neutral-primary outline-none focus:border-border-interactive-emphasis disabled:opacity-60 dark:border-border-default/16 dark:bg-foreground"
-                  />
-                  <p className="font-body text-sm text-text-neutral-tertiary">
-                    Use <code className="font-mono">ws://</code> for local,{" "}
-                    <code className="font-mono">wss://</code> for remote.
-                  </p>
+              <div className="flex flex-col gap-xs">
+                <label className="font-label text-sm font-medium text-text-neutral-secondary">
+                  Auth Token
+                </label>
+                <input
+                  type="password"
+                  placeholder="Paste your token here"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  disabled={pending}
+                  className="rounded-lg border border-border-default bg-background px-m py-s font-body text-md text-text-neutral-primary outline-none focus:border-border-interactive-emphasis disabled:opacity-60 dark:border-border-default/16 dark:bg-foreground"
+                />
+                <p className="font-body text-sm text-text-neutral-tertiary">
+                  Read it from{" "}
+                  <code className="rounded bg-sunk-light px-3xs font-mono text-sm dark:bg-elevated">
+                    ~/.openclaw/openclaw.json
+                  </code>{" "}
+                  (<code className="font-mono">gateway.auth.token</code>) or run{" "}
+                  <code className="rounded bg-sunk-light px-3xs font-mono text-sm dark:bg-elevated">
+                    openclaw onboard
+                  </code>{" "}
+                  to set a new one. Stored locally — only needed once per device.
+                </p>
+              </div>
+
+              {error ? (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-border-danger bg-danger-background px-m py-s font-body text-md text-text-danger-primary"
+                >
+                  {error}
                 </div>
+              ) : null}
 
-                <div className="flex flex-col gap-xs">
-                  <label className="font-label text-sm font-medium text-text-neutral-secondary">
-                    Auth Token
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="Paste your token here"
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    disabled={pending}
-                    className="rounded-lg border border-border-default bg-background px-m py-s font-body text-md text-text-neutral-primary outline-none focus:border-border-interactive-emphasis disabled:opacity-60 dark:border-border-default/16 dark:bg-foreground"
-                  />
-                  <p className="font-body text-sm text-text-neutral-tertiary">
-                    Run{" "}
-                    <code className="rounded bg-sunk-light px-3xs font-mono text-sm dark:bg-elevated">
-                      openclaw auth token
-                    </code>{" "}
-                    to get your token. Stored locally — only needed once per device.
-                  </p>
+              {pending ? (
+                <div className="flex items-center gap-xs font-body text-md text-text-neutral-tertiary">
+                  <Wifi size={14} className="animate-pulse" />
+                  Connecting to {gatewayUrl.trim()}…
                 </div>
+              ) : null}
 
-                {error ? (
-                  <div
-                    role="alert"
-                    className="rounded-lg border border-border-danger bg-danger-background px-m py-s font-body text-md text-text-danger-primary"
-                  >
-                    {error}
-                  </div>
-                ) : null}
-
-                {pending ? (
-                  <div className="flex items-center gap-xs font-body text-md text-text-neutral-tertiary">
-                    <Wifi size={14} className="animate-pulse" />
-                    Connecting to {gatewayUrl.trim()}…
-                  </div>
-                ) : null}
-
-                <div className="mt-s flex justify-end gap-s">
-                  <Button variant="secondary" size="md" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button variant="primary" size="md" type="submit" disabled={pending}>
-                    {pending ? "Connecting…" : "Save & Connect"}
-                  </Button>
-                </div>
-              </form>
-            </>
-          ) : null}
+              <div className="mt-s flex justify-end gap-s">
+                <Button variant="secondary" size="md" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button variant="primary" size="md" type="submit" disabled={pending}>
+                  {pending ? "Connecting…" : "Save & Connect"}
+                </Button>
+              </div>
+            </form>
+          </>
         </div>
       </div>
     </dialog>
