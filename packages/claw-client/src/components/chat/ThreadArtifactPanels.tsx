@@ -126,27 +126,34 @@ export function ThreadArtifactPanels({
         </ArtifactPanel>
       ))}
 
-      {paneUploads.map((upload) => (
-        // The user-message chip clicks `sessionUploadPreviewId(remoteId)`
-        // (extracted from message content). For pending entries that haven't
-        // been replaced by their `listUploads` counterpart yet, `upload.id` is
-        // a locally-generated id while `upload.remoteId` is the plugin meta id
-        // — register against the remoteId so the chip's open() finds this
-        // panel mid-stream, not just after history reload.
-        <ArtifactPanel
-          key={upload.remoteId ?? upload.id}
-          artifactId={sessionUploadPreviewId(upload.remoteId ?? upload.id)}
-          title={upload.name}
-          header={false}
-        >
-          <div className="flex h-full flex-col">
-            <DetailTopBar title={upload.name} onClose={handleClose} />
-            <div className="min-h-0 flex-1 overflow-auto bg-sunk-light dark:bg-sunk-deep">
-              <UploadPreviewPanel upload={upload} uploadStore={uploads} />
+      {paneUploads
+        // Skip non-previewable kinds (`file` — binaries we don't decode). The
+        // chip in `UserMessage` is rendered as a static `<div>` for these so
+        // there's nothing to portal into; registering a panel here would
+        // either show a placeholder or leak the raw `data:` URL into a `<pre>`
+        // (the renderer's `file` fallback uses `resolveTextContent`).
+        .filter((upload) => upload.kind !== "file")
+        .map((upload) => (
+          // The user-message chip clicks `sessionUploadPreviewId(remoteId)`
+          // (extracted from message content). For pending entries that haven't
+          // been replaced by their `listUploads` counterpart yet, `upload.id`
+          // is a locally-generated id while `upload.remoteId` is the plugin
+          // meta id — register against the remoteId so the chip's open()
+          // finds this panel mid-stream, not just after history reload.
+          <ArtifactPanel
+            key={upload.remoteId ?? upload.id}
+            artifactId={sessionUploadPreviewId(upload.remoteId ?? upload.id)}
+            title={upload.name}
+            header={false}
+          >
+            <div className="flex h-full flex-col">
+              <DetailTopBar title={upload.name} onClose={handleClose} />
+              <div className="min-h-0 flex-1 overflow-auto bg-sunk-light dark:bg-sunk-deep">
+                <UploadPreviewPanel upload={upload} uploadStore={uploads} />
+              </div>
             </div>
-          </div>
-        </ArtifactPanel>
-      ))}
+          </ArtifactPanel>
+        ))}
     </>
   );
 }

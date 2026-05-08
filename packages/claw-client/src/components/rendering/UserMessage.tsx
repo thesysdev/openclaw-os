@@ -1,7 +1,11 @@
 "use client";
 
 import { separateContentAndContext } from "@/lib/content-parser";
-import { extractMessageUploadIds, sessionUploadPreviewId } from "@/lib/session-workspace";
+import {
+  extractMessageUploadIds,
+  inferWorkspacePreviewKind,
+  sessionUploadPreviewId,
+} from "@/lib/session-workspace";
 import { useUploadMeta, useUploadPreview } from "@/lib/uploads-context";
 import type { UserMessage as UserMsg } from "@openuidev/react-headless";
 import { useArtifactStore } from "@openuidev/react-headless";
@@ -40,10 +44,9 @@ function FormDataAccordion({ contextString }: { contextString: string }) {
   );
 }
 
-function kindIcon(kind: string | undefined) {
+function kindIcon(kind: string): React.ComponentType<{ className?: string }> {
   switch (kind) {
     case "code":
-    case "html":
       return FileCode2;
     case "image":
       return FileImage;
@@ -56,29 +59,39 @@ function kindIcon(kind: string | undefined) {
   }
 }
 
-function inferKindFromMime(mimeType: string | undefined): string {
-  if (!mimeType) return "file";
-  if (mimeType.startsWith("image/")) return "image";
-  if (mimeType === "application/pdf") return "pdf";
-  if (mimeType === "text/html") return "html";
-  if (
-    mimeType.startsWith("text/") ||
-    mimeType === "application/json" ||
-    mimeType === "application/xml" ||
-    mimeType === "application/javascript"
-  )
-    return "text";
-  return "file";
+// Kinds whose preview panel actually shows something useful. Anything else
+// (`file` — the catch-all for binary blobs we don't decode) renders the chip
+// as a non-interactive label so we don't open an empty/garbage panel.
+const PREVIEWABLE_KINDS: ReadonlySet<string> = new Set([
+  "image",
+  "pdf",
+  "markdown",
+  "text",
+  "code",
+  "ppt",
+]);
+
+function isPreviewable(kind: string): boolean {
+  return PREVIEWABLE_KINDS.has(kind);
 }
 
 function InlineUploadChip({ remoteId }: { remoteId: string }) {
   const meta = useUploadMeta(remoteId);
   const dataUrl = useUploadPreview(remoteId);
-  const kind = inferKindFromMime(meta?.mimeType);
+  // Match the workspace's kind so the chip's previewable-ness lines up with
+  // whether `ThreadArtifactPanels` will register a panel.
+  const kind = meta ? inferWorkspacePreviewKind(meta.name, meta.mimeType) : "file";
   const Icon = kindIcon(kind);
   const name = meta?.name ?? "Attachment";
   const artifactStore = useArtifactStore();
   const previewId = sessionUploadPreviewId(remoteId);
+  // Default to clickable while meta is still loading — flipping the chip
+  // from static-div to button on meta arrival is a worse UX than briefly
+  // showing a clickable placeholder. ThreadArtifactPanels filters
+  // `kind === "file"` from `workspace.uploads` (which is set at `addFiles`
+  // / history-load time, not bound to meta hydration), so a click during
+  // the loading window is a no-op for binaries — no empty panel opens.
+  const previewable = !meta || isPreviewable(kind);
   const openArtifact = () => artifactStore.getState().openArtifact(previewId);
 
   // If this chip unmounts (message scrolls out of a virtualised list, thread
@@ -100,10 +113,7 @@ function InlineUploadChip({ remoteId }: { remoteId: string }) {
   // owned by `ThreadArtifactPanels` (driven by `workspace.uploads`). We must
   // NOT register a second panel with the same `previewId` here, otherwise
   // both panels portal into the active artifact target and the user sees the
-  // file rendered twice (this chip's "Attachment — preview not available"
-  // placeholder stacked above the workspace's real preview). The chip is
-  // just a thumbnail/click affordance; clicking calls `openArtifact(previewId)`
-  // and `ThreadArtifactPanels`' panel handles the actual rendering.
+  // file rendered twice. The chip is just a thumbnail/click affordance.
 
   if (kind === "image" && dataUrl) {
     return (
@@ -115,6 +125,30 @@ function InlineUploadChip({ remoteId }: { remoteId: string }) {
       >
         <img src={dataUrl} alt={name} className="block h-24 w-24 object-cover" />
       </button>
+    );
+  }
+
+  // Non-previewable kinds render as a static `<div>` — no `onClick`, no
+  // hover/cursor affordance — so the user can still see what was attached
+  // without opening a placeholder panel that has nothing useful to show.
+  if (!previewable) {
+    return (
+      <div
+        className="inline-flex items-center gap-2 rounded-xl border border-border-default bg-background px-3 py-2 text-left text-sm shadow-sm"
+        title={name}
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-text-neutral-secondary">
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className="flex max-w-[180px] flex-col">
+          <span className="truncate text-sm font-medium text-text-neutral-primary">{name}</span>
+          {meta?.mimeType ? (
+            <span className="truncate text-sm uppercase tracking-wide text-text-neutral-tertiary">
+              {meta.mimeType}
+            </span>
+          ) : null}
+        </span>
+      </div>
     );
   }
 

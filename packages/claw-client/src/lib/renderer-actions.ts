@@ -1,6 +1,6 @@
 "use client";
 
-import { wrapContent, wrapContext } from "@/lib/content-parser";
+import { wrapContext } from "@/lib/content-parser";
 import { BuiltinActionType, type ActionEvent } from "@openuidev/react-lang";
 
 /**
@@ -96,15 +96,14 @@ export function buildContinueConversationPayload(
   if (event.type !== BuiltinActionType.ContinueConversation) return null;
 
   // Prepend app context so the assistant sees what the user was looking at
-  // when they clicked. Wrapped inside <content> so downstream chat UI displays
-  // it as part of the visible message — the context envelope is reserved for
-  // structured, typed entries consumed by session-workspace.
+  // when they clicked. The chat bubble strips the trailing `<context>` block
+  // (which carries the typed-context envelope for `session-workspace`) and
+  // displays the rest as the visible message.
   const humanMessage = event.humanFriendlyMessage;
   const prefixed = appContext
     ? `${formatAppContextPrefix(appContext)}\n${humanMessage}`
     : humanMessage;
 
-  const contentPart = wrapContent(prefixed);
   const ctx: unknown[] = [`User clicked: ${humanMessage}`];
 
   const formState =
@@ -114,6 +113,6 @@ export function buildContinueConversationPayload(
 
   return {
     role: "user",
-    content: contentPart + wrapContext(JSON.stringify(ctx)),
+    content: prefixed + wrapContext(JSON.stringify(ctx)),
   };
 }

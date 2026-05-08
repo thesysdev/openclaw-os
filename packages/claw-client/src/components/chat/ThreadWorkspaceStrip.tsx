@@ -123,6 +123,16 @@ export function ThreadWorkspaceStrip({
           // pre-`uploads.put` pending entries.
           const previewId = sessionUploadPreviewId(upload.remoteId ?? upload.id);
           const isActive = activeArtifactId === previewId;
+          // `file` kind has no preview UI — render the tile as a static label
+          // (matches `InlineUploadChip` in `UserMessage`) so we don't open an
+          // empty/garbage panel on click.
+          if (upload.kind === "file") {
+            return (
+              <div key={upload.id} title={upload.name} className="rounded-m p-2xs">
+                <TextTile label={upload.name} />
+              </div>
+            );
+          }
           return (
             <button
               key={upload.id}

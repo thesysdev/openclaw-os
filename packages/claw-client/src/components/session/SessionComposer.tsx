@@ -10,7 +10,7 @@ import {
   parseSlashCommand,
   type CommandContext,
 } from "@/lib/commands";
-import { wrapContent, wrapContext } from "@/lib/content-parser";
+import { wrapContext } from "@/lib/content-parser";
 import type { GatewayCommand } from "@/lib/engines/types";
 import {
   ROTATING_WORD_STAGGER_MS,
@@ -620,9 +620,19 @@ export function SessionComposer({
       linkedArtifact,
       uploads: pendingUploads,
     });
+    // The body is the user's text verbatim — no `<content>` wrapper. The
+    // wrapper used to exist to disambiguate user text from the trailing
+    // `<context>` block, but it (a) defeated the gateway's slash-command
+    // detector (which scans for a leading `/`) and (b) needed escape/decode
+    // round-tripping to survive a literal `</content>` typed by the user.
+    // The parser now anchors on the *last* `<context>...</context>` pair
+    // with a tail that must be empty / whitespace / `<file>` blocks, so
+    // user text containing literal `<context>` markers mid-message no
+    // longer collides with our framing. Mirrors `AssistantMessage`'s
+    // `${body}<context>...</context>` shape for symmetry.
     const contentParts =
       contextPayload.length > 0
-        ? [wrapContent(humanText), wrapContext(JSON.stringify(contextPayload))]
+        ? [humanText, wrapContext(JSON.stringify(contextPayload))]
         : [humanText];
 
     const uploadIds = pendingUploads.map((upload) => upload.id);

@@ -331,6 +331,26 @@ export function WorkspaceSections({
               // doesn't break the chip's open() during streaming).
               const previewKey = upload.remoteId ?? upload.id;
               const isActive = activePreviewId === `session-upload:${previewKey}`;
+              // `file` kind has no preview UI — `ThreadArtifactPanels` skips
+              // panel registration for it, so a `NavTab` here would render a
+              // cursor-pointer button that does nothing on click. Render a
+              // plain non-interactive row instead so the user still sees the
+              // name + type tag but the affordance matches reality.
+              if (upload.kind === "file") {
+                return (
+                  <div
+                    key={upload.id}
+                    title={upload.name}
+                    className="flex items-center gap-s px-s py-2xs"
+                  >
+                    <TextTile label={upload.name} />
+                    <span className="flex-1 overflow-hidden whitespace-nowrap text-ellipsis text-sm font-normal text-text-neutral-tertiary">
+                      {upload.name}
+                    </span>
+                    <TypeTag label={kindLabel(upload.kind)} />
+                  </div>
+                );
+              }
               return (
                 <NavTab
                   key={upload.id}
