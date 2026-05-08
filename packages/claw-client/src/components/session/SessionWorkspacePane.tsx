@@ -9,7 +9,6 @@ import {
   LayoutGrid,
   PanelRightClose,
   PanelRightOpen,
-  Plus,
   X,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -150,7 +149,6 @@ export function WorkspaceSections({
   onOpenApp,
   onOpenArtifact,
   onOpenUpload,
-  onPickFiles,
 }: WorkspacePaneProps) {
   const [openMap, setOpenMap] = useState({
     apps: true,
@@ -299,18 +297,7 @@ export function WorkspaceSections({
         setHoveredId={setHoveredId}
       >
         {contextCount === 0 ? (
-          <EmptyBox
-            label="No context yet"
-            action={
-              <button
-                type="button"
-                onClick={onPickFiles}
-                className="inline-flex items-center gap-2xs rounded-m border border-border-default/70 bg-background px-s py-2xs font-label text-sm text-text-neutral-secondary shadow-sm transition-colors hover:bg-sunk-light hover:text-text-neutral-primary dark:border-border-default/16 dark:bg-foreground dark:hover:bg-elevated"
-              >
-                <Plus size={12} /> Add context
-              </button>
-            }
-          />
+          <EmptyBox label="No context yet" />
         ) : (
           <>
             {linkedApp
@@ -338,7 +325,32 @@ export function WorkspaceSections({
               : null}
             {uploads.map((upload) => {
               const rowId = `upload-${upload.id}`;
-              const isActive = activePreviewId === `session-upload:${upload.id}`;
+              // Use remoteId when present so this matches the artifactId
+              // registered by ThreadArtifactPanels (which keys panels by
+              // `upload.remoteId ?? upload.id` so pending-vs-sent upload state
+              // doesn't break the chip's open() during streaming).
+              const previewKey = upload.remoteId ?? upload.id;
+              const isActive = activePreviewId === `session-upload:${previewKey}`;
+              // `file` kind has no preview UI — `ThreadArtifactPanels` skips
+              // panel registration for it, so a `NavTab` here would render a
+              // cursor-pointer button that does nothing on click. Render a
+              // plain non-interactive row instead so the user still sees the
+              // name + type tag but the affordance matches reality.
+              if (upload.kind === "file") {
+                return (
+                  <div
+                    key={upload.id}
+                    title={upload.name}
+                    className="flex items-center gap-s px-s py-2xs"
+                  >
+                    <TextTile label={upload.name} />
+                    <span className="flex-1 overflow-hidden whitespace-nowrap text-ellipsis text-sm font-normal text-text-neutral-tertiary">
+                      {upload.name}
+                    </span>
+                    <TypeTag label={kindLabel(upload.kind)} />
+                  </div>
+                );
+              }
               return (
                 <NavTab
                   key={upload.id}
@@ -352,23 +364,13 @@ export function WorkspaceSections({
                   label={upload.name}
                   active={isActive}
                   hovered={hoveredId === rowId}
-                  onClick={() => onOpenUpload(upload.id)}
+                  onClick={() => onOpenUpload(previewKey)}
                   onMouseEnter={() => setHoveredId(rowId)}
                   onMouseLeave={() => setHoveredId(null)}
                   trailing={<TypeTag label={kindLabel(upload.kind)} />}
                 />
               );
             })}
-            {/* Add-context affordance — mirrors the "View all" border-tile style. */}
-            <NavTab
-              tile={<BorderTile icon={Plus} />}
-              label="Add context"
-              muted
-              hovered={hoveredId === "ctx-add"}
-              onClick={onPickFiles}
-              onMouseEnter={() => setHoveredId("ctx-add")}
-              onMouseLeave={() => setHoveredId(null)}
-            />
           </>
         )}
       </Section>

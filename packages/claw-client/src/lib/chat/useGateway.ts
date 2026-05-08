@@ -1,7 +1,6 @@
 "use client";
 
 import { separateContentAndContext } from "@/lib/content-parser";
-import type { CronJobRecord, CronRunEntry, CronStatusRecord } from "@/lib/cron";
 import {
   OpenClawEngine,
   resolveChatSessionKey,
@@ -15,16 +14,18 @@ import type {
   UploadStore,
 } from "@/lib/engines/types";
 import { ConnectionState } from "@/lib/gateway/types";
-import { shouldSurfaceNotification, type NotificationRecord } from "@/lib/notifications";
 import type { Settings } from "@/lib/storage";
 import { getSettings, saveSettings } from "@/lib/storage";
 import { deriveTitleFromText, isOpaqueSessionTitle } from "@/lib/thread-titles";
 import type { ClawThreadListItem, ModelChoice, SessionRow } from "@/types/gateway-responses";
 import { EventType } from "@openuidev/react-headless";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { sessionRouteIdFromSessionKey } from "./session-routing";
+import { useCronGateway } from "./useCronGateway";
+import { useNotificationsGateway } from "./useNotificationsGateway";
 
 export type { ClawThreadListItem, ModelChoice, SessionRow } from "@/types/gateway-responses";
-export { resolveChatSessionKey };
+export { resolveChatSessionKey, sessionRouteIdFromSessionKey };
 
 function extractUserMessageText(content: unknown): string {
   if (typeof content === "string") {
@@ -60,19 +61,6 @@ function deriveThreadTitleFromMessages(messages: unknown[]): string | null {
   return null;
 }
 
-export function sessionRouteIdFromSessionKey(
-  sessionKey: string,
-  knownAgentIds: Set<string>,
-): string {
-  for (const agentId of knownAgentIds) {
-    if (resolveChatSessionKey(agentId, knownAgentIds) === sessionKey) {
-      return agentId;
-    }
-  }
-
-  return sessionKey;
-}
-
 export function useGateway({ onAuthFailed }: { onAuthFailed: () => void }) {
   const threadListRefreshFnRef = useRef<(() => void) | null>(null);
   const requestThreadListRefresh = useCallback((fn: () => void) => {
@@ -92,10 +80,6 @@ export function useGateway({ onAuthFailed }: { onAuthFailed: () => void }) {
   const [artifacts, setArtifacts] = useState<ArtifactStore | undefined>(undefined);
   const [apps, setApps] = useState<AppStore | undefined>(undefined);
   const [uploads, setUploads] = useState<UploadStore | undefined>(undefined);
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
-  const [cronJobs, setCronJobs] = useState<CronJobRecord[]>([]);
-  const [cronRuns, setCronRuns] = useState<CronRunEntry[]>([]);
-  const [cronStatus, setCronStatus] = useState<CronStatusRecord | null>(null);
   const [gatewayCommands, setGatewayCommands] = useState<GatewayCommand[]>([]);
 
   const onAuthFailedRef = useRef(onAuthFailed);
@@ -116,6 +100,38 @@ export function useGateway({ onAuthFailed }: { onAuthFailed: () => void }) {
   // yet), so a ref is the connector.
   const cronRefreshFnRef = useRef<(() => Promise<unknown>) | null>(null);
   const cronRefreshTimerRef = useRef<number | null>(null);
+
+  // Notifications + cron live in their own sub-hooks. Cron depends on
+  // notifications so that cron-run upserts can patch the cached list without
+  // a redundant `listNotifications` round-trip.
+  const {
+    notifications,
+    setNotifications,
+    refreshNotifications,
+    markNotificationsRead,
+    upsertNotification,
+  } = useNotificationsGateway(engineRef);
+
+  const {
+    cronJobs,
+    cronRuns,
+    cronStatus,
+    refreshCronData,
+    updateCronJob,
+    runCronJob,
+    removeCronJob,
+  } = useCronGateway(
+    engineRef,
+    knownAgentIds,
+    connectionState,
+    refreshNotifications,
+    setNotifications,
+  );
+
+  // Keep the engine-side cron callback pointing at the latest closure.
+  useEffect(() => {
+    cronRefreshFnRef.current = refreshCronData;
+  }, [refreshCronData]);
 
   useEffect(() => {
     sessionMetaRef.current = sessionMeta;
@@ -186,6 +202,15 @@ export function useGateway({ onAuthFailed }: { onAuthFailed: () => void }) {
 
   const reconnect = useCallback((newSettings: Settings) => {
     engineRef.current?.reconnect(newSettings);
+  }, []);
+
+  // User-initiated abort. Tells the gateway to stop the in-flight run on
+  // `threadId`. The engine's AbortController-listener intentionally does NOT
+  // fire `chat.abort` (it'd also fire on every thread switch via
+  // `ChatProvider.selectThread`, killing background runs). This callback is
+  // the explicit "Stop button" path the composer wires up.
+  const abort = useCallback(async (threadId: string): Promise<void> => {
+    await engineRef.current?.abort(threadId);
   }, []);
 
   const processMessage = useCallback(
@@ -316,195 +341,6 @@ export function useGateway({ onAuthFailed }: { onAuthFailed: () => void }) {
     [],
   );
 
-  const refreshNotifications = useCallback(async (): Promise<NotificationRecord[]> => {
-    const next = await engineRef.current?.listNotifications();
-    const list = (next ?? []).filter(shouldSurfaceNotification);
-    setNotifications(list);
-    return list;
-  }, []);
-
-  const markNotificationsRead = useCallback(
-    async (ids?: string[]): Promise<boolean> => {
-      const ok = await engineRef.current?.markNotificationsRead(ids);
-      if (ok) {
-        await refreshNotifications();
-      }
-      return ok ?? false;
-    },
-    [refreshNotifications],
-  );
-
-  const upsertNotification = useCallback(
-    async (
-      notification: Omit<
-        NotificationRecord,
-        "id" | "createdAt" | "updatedAt" | "unread" | "readAt"
-      >,
-    ): Promise<boolean> => {
-      const ok = await engineRef.current?.upsertNotification(notification);
-      if (ok) {
-        await refreshNotifications();
-      }
-      return ok ?? false;
-    },
-    [refreshNotifications],
-  );
-
-  const syncCronNotifications = useCallback(async (runs: CronRunEntry[]): Promise<void> => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    const existingNotifications = await engine.listNotifications();
-    const existingDedupeKeys = new Set(
-      (existingNotifications ?? [])
-        .map((notification) => notification.dedupeKey)
-        .filter((value): value is string => typeof value === "string" && value.length > 0),
-    );
-
-    const relevantRuns = runs
-      .filter(
-        (run) =>
-          run.status === "error" ||
-          run.status === "skipped" ||
-          (run.status === "ok" && typeof run.summary === "string" && run.summary.length > 0),
-      )
-      .slice(0, 12);
-
-    await Promise.all(
-      relevantRuns.map(async (run) => {
-        const dedupeKey = `cron-run:${run.jobId}:${run.ts}`;
-        if (existingDedupeKeys.has(dedupeKey)) {
-          return;
-        }
-
-        const message =
-          run.status === "error"
-            ? (run.error ?? "Scheduled run failed.")
-            : run.status === "skipped"
-              ? (run.summary ?? "Scheduled run was skipped.")
-              : (run.summary ?? "Scheduled run completed.");
-
-        await engine.upsertNotification({
-          dedupeKey,
-          kind: run.status === "ok" ? "cron_completed" : "cron_attention",
-          title: run.jobName ?? run.jobId,
-          message,
-          // Route to the crons view (focused on this job) instead of a
-          // synthetic chat sessionId — cron runs don't have a real chat
-          // thread to open.
-          target: { view: "crons", jobId: run.jobId },
-          source: {
-            cronId: run.jobId,
-            sessionKey: run.sessionKey,
-          },
-          metadata: {
-            status: run.status,
-            summary: run.summary,
-            error: run.error,
-            deliveryStatus: run.deliveryStatus,
-            runAtMs: run.runAtMs,
-            nextRunAtMs: run.nextRunAtMs,
-          },
-        });
-      }),
-    );
-  }, []);
-
-  const refreshCronData = useCallback(async () => {
-    const engine = engineRef.current;
-    if (!engine) {
-      setCronJobs([]);
-      setCronRuns([]);
-      setCronStatus(null);
-      return { jobs: [], runs: [], status: null };
-    }
-
-    const [jobs, runs, status] = await Promise.all([
-      engine.listCronJobs(),
-      engine.listCronRuns(),
-      engine.getCronStatus(),
-    ]);
-
-    const normalizedJobs = jobs
-      .map((job) => ({
-        ...job,
-        threadId: job.sessionKey
-          ? sessionRouteIdFromSessionKey(job.sessionKey, knownAgentIds.current)
-          : undefined,
-      }))
-      .sort((left, right) => {
-        const leftNext = left.state?.nextRunAtMs ?? Number.MAX_SAFE_INTEGER;
-        const rightNext = right.state?.nextRunAtMs ?? Number.MAX_SAFE_INTEGER;
-        return leftNext - rightNext;
-      });
-
-    const normalizedRuns = runs.map((run) => ({
-      ...run,
-      threadId: run.sessionKey
-        ? sessionRouteIdFromSessionKey(run.sessionKey, knownAgentIds.current)
-        : run.sessionId,
-    }));
-
-    setCronJobs(normalizedJobs);
-    setCronRuns(normalizedRuns);
-    setCronStatus(status);
-
-    await syncCronNotifications(normalizedRuns);
-    await refreshNotifications();
-
-    return {
-      jobs: normalizedJobs,
-      runs: normalizedRuns,
-      status,
-    };
-  }, [refreshNotifications, syncCronNotifications]);
-
-  // Keep the engine-side cron callback pointing at the latest closure.
-  useEffect(() => {
-    cronRefreshFnRef.current = refreshCronData;
-  }, [refreshCronData]);
-
-  useEffect(() => {
-    if (connectionState !== ConnectionState.CONNECTED) return;
-
-    let intervalId: number | null = null;
-
-    const stopPolling = () => {
-      if (intervalId !== null) {
-        window.clearInterval(intervalId);
-        intervalId = null;
-      }
-    };
-
-    const startPolling = () => {
-      if (document.visibilityState === "hidden" || intervalId !== null) return;
-      intervalId = window.setInterval(() => {
-        void refreshCronData().catch((error) => {
-          console.warn("[claw] cron refresh failed:", error);
-        });
-      }, 30000);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        stopPolling();
-        return;
-      }
-
-      void refreshCronData().catch((error) => {
-        console.warn("[claw] cron refresh failed:", error);
-      });
-      startPolling();
-    };
-
-    handleVisibilityChange();
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      stopPolling();
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [connectionState, refreshCronData]);
-
   // Pull the gateway's native slash-command catalog + subscribe to
   // `sessions.changed` once per connect. Autocomplete needs the commands;
   // `sessions.changed` lets us know when a transcript mutated out of band
@@ -537,21 +373,6 @@ export function useGateway({ onAuthFailed }: { onAuthFailed: () => void }) {
     };
   }, []);
 
-  const updateCronJob = useCallback(
-    async (id: string, patch: Record<string, unknown>) =>
-      engineRef.current?.updateCronJob(id, patch) ?? false,
-    [],
-  );
-  const runCronJob = useCallback(
-    async (id: string, mode: "force" | "due" = "force") =>
-      engineRef.current?.runCronJob(id, mode) ?? false,
-    [],
-  );
-  const removeCronJob = useCallback(
-    async (id: string) => engineRef.current?.removeCronJob(id) ?? false,
-    [],
-  );
-
   return {
     connectionState,
     pairingDeviceId,
@@ -565,6 +386,7 @@ export function useGateway({ onAuthFailed }: { onAuthFailed: () => void }) {
     compactSession,
     renameSession,
     reconnect,
+    abort,
     requestThreadListRefresh,
     sessionMeta,
     availableModels,

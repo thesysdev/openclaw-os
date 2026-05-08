@@ -14,7 +14,7 @@ import {
   useHashRoute,
 } from "@/lib/hooks/useHashRoute";
 import type { ClawThread } from "@/types/claw-thread";
-import { useThreadList } from "@openuidev/react-headless";
+import { useActiveArtifact, useThreadList } from "@openuidev/react-headless";
 import {
   ChevronRight,
   Clock3,
@@ -25,6 +25,7 @@ import {
   Moon,
   PanelLeft,
   PanelLeftClose,
+  Pin,
   Search,
   Sun,
   Wifi,
@@ -148,7 +149,24 @@ export function AppSidebar({
   const activeChatId = route?.view === "chat" ? route.sessionId : null;
 
   // ── Local state ──
-  const [navCollapsed, setNavCollapsed] = useState(false);
+  // Auto-collapse when the user is reading a detail surface so the content has
+  // more room. Two triggers:
+  //  1. Fullscreen app/artifact route (`/apps/<id>`, `/artifacts/<id>`).
+  //  2. An in-chat artifact preview is open — the artifact panel claims the
+  //     right pane, so reclaim sidebar width to keep the chat readable.
+  // The user can still toggle manually after — we only force a collapse on
+  // entry (not on exit), so e.g. /apps/A → /apps/B → home keeps the choice.
+  const { activeArtifactId } = useActiveArtifact();
+  const isDetailRoute =
+    route?.view === "app" || route?.view === "artifact" || activeArtifactId != null;
+  const [navCollapsed, setNavCollapsed] = useState(isDetailRoute);
+  const lastWasDetailRef = useRef(isDetailRoute);
+  useEffect(() => {
+    if (isDetailRoute && !lastWasDetailRef.current) {
+      setNavCollapsed(true);
+    }
+    lastWasDetailRef.current = isDetailRoute;
+  }, [isDetailRoute]);
   const isDark = themeMode === "dark";
   const [sectionsOpen, setSectionsOpen] = useState({
     agents: true,
@@ -588,6 +606,7 @@ export function AppSidebar({
                   const id = `app-${app.id}`;
                   const isActive = activeAppId === app.id;
                   const isH = hov === id;
+                  const isPinned = pinnedAppIds.has(app.id);
                   return (
                     <NavTab
                       key={app.id}
@@ -607,6 +626,15 @@ export function AppSidebar({
                       onClick={() => navigate({ view: "app", appId: app.id })}
                       onMouseEnter={() => setHov(id)}
                       onMouseLeave={() => setHov(null)}
+                      trailing={
+                        isPinned ? (
+                          <Pin
+                            size={12}
+                            className="shrink-0 fill-current text-text-neutral-tertiary"
+                            aria-label="Pinned"
+                          />
+                        ) : null
+                      }
                     />
                   );
                 })

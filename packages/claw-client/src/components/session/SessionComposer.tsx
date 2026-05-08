@@ -10,7 +10,7 @@ import {
   parseSlashCommand,
   type CommandContext,
 } from "@/lib/commands";
-import { wrapContent, wrapContext } from "@/lib/content-parser";
+import { wrapContext } from "@/lib/content-parser";
 import type { GatewayCommand } from "@/lib/engines/types";
 import {
   ROTATING_WORD_STAGGER_MS,
@@ -375,6 +375,7 @@ export function SessionComposer({
   onAddFiles,
   onRemoveUpload,
   onUploadsSent,
+  onStop,
   commandContext,
   gatewayCommands = [],
   onDispatchGatewayCommand,
@@ -407,6 +408,14 @@ export function SessionComposer({
   onAddFiles?: (files: File[]) => void | Promise<void>;
   onRemoveUpload: (uploadId: string) => void;
   onUploadsSent: (uploadIds: string[]) => void;
+  /**
+   * User-initiated Stop. Fires alongside `cancelMessage` when the user clicks
+   * the Stop button — `cancelMessage` closes the local stream, `onStop` is
+   * the explicit gateway-side abort signal. The chat-store's AbortController
+   * also fires on thread switches, so the engine can't infer user-intent
+   * from the signal alone.
+   */
+  onStop?: () => void;
   commandContext?: () => CommandContext;
   gatewayCommands?: GatewayCommand[];
   models?: ModelChoice[];
@@ -611,9 +620,19 @@ export function SessionComposer({
       linkedArtifact,
       uploads: pendingUploads,
     });
+    // The body is the user's text verbatim — no `<content>` wrapper. The
+    // wrapper used to exist to disambiguate user text from the trailing
+    // `<context>` block, but it (a) defeated the gateway's slash-command
+    // detector (which scans for a leading `/`) and (b) needed escape/decode
+    // round-tripping to survive a literal `</content>` typed by the user.
+    // The parser now anchors on the *last* `<context>...</context>` pair
+    // with a tail that must be empty / whitespace / `<file>` blocks, so
+    // user text containing literal `<context>` markers mid-message no
+    // longer collides with our framing. Mirrors `AssistantMessage`'s
+    // `${body}<context>...</context>` shape for symmetry.
     const contentParts =
       contextPayload.length > 0
-        ? [wrapContent(humanText), wrapContext(JSON.stringify(contextPayload))]
+        ? [humanText, wrapContext(JSON.stringify(contextPayload))]
         : [humanText];
 
     const uploadIds = pendingUploads.map((upload) => upload.id);
@@ -859,7 +878,14 @@ export function SessionComposer({
               isRunning ? "Stop" : parsedCommand ? `Run /${parsedCommand.command.name}` : "Send"
             }
             disabled={!isRunning && isDisabled}
-            onClick={isRunning ? cancelMessage : () => void handleSubmit()}
+            onClick={
+              isRunning
+                ? () => {
+                    onStop?.();
+                    cancelMessage();
+                  }
+                : () => void handleSubmit()
+            }
           />
         </div>
       </div>
@@ -937,13 +963,13 @@ export function SessionComposer({
                     onChange={onModelChange}
                     title="Model"
                     options={[
-                      {
-                        value: "",
-                        // When we can identify the resolved default model, label
-                        // the row "Default (Name)". Filter that same model out of
-                        // the list below so it doesn't appear twice.
-                        label: defaultModel ? `Default (${defaultModel.name})` : "Default",
-                      },
+                      // The "" value still represents "use the resolved default"
+                      // — we just label it with the model's own name so the
+                      // list reads as a flat catalog. The default model is
+                      // filtered from the rest so it doesn't appear twice.
+                      ...(defaultModel
+                        ? [{ value: "", label: defaultModel.name, group: defaultModel.provider }]
+                        : [{ value: "", label: "Default" }]),
                       ...uniqueModels
                         .filter((m) => m !== defaultModel)
                         .map((m) => ({

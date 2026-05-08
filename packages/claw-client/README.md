@@ -1,23 +1,18 @@
 # @openuidev/claw-client
 
-> Next.js web client that connects to an [OpenClaw](https://github.com/openclaw/openclaw) gateway and renders agent responses as live, interactive UI using the [OpenUI](https://openui.com) React renderer.
+> The workspace UI for [OpenClaw OS](../../README.md). A Next.js app that connects to an [OpenClaw](https://github.com/openclaw/openclaw) gateway and renders agent responses as live, interactive components using the [OpenUI](https://openui.com) React renderer.
 
-This is the browser side of [OpenClaw OS](../../README.md). The other half is the server-side [`@openuidev/openclaw-os-plugin`](../claw-plugin), which injects the OpenUI Lang system prompt into agent runs.
-
-<!-- Add screenshot / gif here:
-<div align="center">
-  <img src="./public/screenshot.png" alt="Claw client chat surface" width="100%" />
-</div>
--->
+In a normal install the workspace is statically exported and bundled into [`@openuidev/openclaw-os-plugin`](../claw-plugin), then served from your gateway at `http://<gateway>/plugins/openclawos`. This package is the source for that UI — most users will never need to run it directly.
 
 ## Features
 
 - **Streaming chat surface** — renders OpenUI Lang components progressively as the LLM emits tokens.
 - **Multi-agent sidebar** — every agent the gateway exposes appears as its own thread.
-- **Artifacts, apps, notifications** — persistent UI primitives stored by the plugin and surfaced in the client.
-- **Settings dialog** — paste your gateway URL and auth token; everything is stored locally in the browser.
+- **Apps, artifacts, notifications** — persistent UI primitives stored by the plugin and surfaced in the workspace.
+- **Mobile + desktop** — the same workspace works on a phone, tablet, or laptop.
+- **Same-origin auth** — when served from the plugin, the workspace inherits the gateway's auth and connects over the same-origin WebSocket. No CORS, no manual settings dialog.
 - **Tailwind 3 + Radix** — styling and primitives.
-- **Cloudflare-deployable** — built with [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) so the same Next.js app can run on Workers + KV.
+- **Cloudflare-deployable** — also builds with [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare), so the same Next.js app can run on Workers + KV when needed.
 
 ## Tech stack
 
@@ -27,11 +22,13 @@ This is the browser side of [OpenClaw OS](../../README.md). The other half is th
 | Styling | Tailwind CSS 3 + `@tailwindcss/typography` + Radix UI |
 | OpenUI runtime | `@openuidev/react-lang`, `@openuidev/react-ui`, `@openuidev/react-headless` |
 | Search | `fuse.js`, `cmdk` |
-| Crypto | `@noble/ed25519`, `@noble/hashes` (for gateway auth) |
-| Deploy target | Cloudflare Workers via `@opennextjs/cloudflare` |
+| Crypto | `@noble/ed25519`, `@noble/hashes` (gateway auth) |
+| Optional deploy target | Cloudflare Workers via `@opennextjs/cloudflare` |
 | TypeScript | Strict mode, root tsconfig with `noUncheckedIndexedAccess` |
 
 ## Local development
+
+You only need this flow if you're working on the workspace UI itself. End users get the bundled UI through the plugin.
 
 From the repo root:
 
@@ -45,28 +42,24 @@ Then in this package:
 pnpm dev      # Next.js dev server on http://localhost:18790
 ```
 
-You will also need an OpenClaw gateway running with [`@openuidev/openclaw-os-plugin`](../claw-plugin) installed. See the [root README](../../README.md#quick-start) for the end-to-end setup.
+You will also need an OpenClaw gateway running with [`@openuidev/openclaw-os-plugin`](../claw-plugin) installed. See the [root README](../../README.md#quick-start) for end-to-end setup.
 
 ### Connecting to a gateway
 
+When running standalone (not served from the plugin), the workspace cannot infer auth from the origin:
+
 1. Open http://localhost:18790
 2. Open **Settings**
-3. Paste your gateway URL (e.g. `wss://your-gateway.example.com/ws`) and auth token
+3. Paste your gateway URL (e.g. `ws://localhost:18789` or `wss://your-gateway.example.com/ws`) and auth token from `~/.openclaw/openclaw.json`
 4. Pick an agent from the sidebar and start chatting
 
-You can read your local gateway URL and token with:
-
-```bash
-node ../../scripts/connection-info.mjs
-```
-
-It reads from `~/.openclaw/openclaw.json`.
+To get a pre-authenticated URL straight from the gateway, run `openclaw os url` (registered by the plugin).
 
 ## Scripts
 
 ```bash
 pnpm dev          # Next.js dev server (port 18790)
-pnpm build        # Next.js production build
+pnpm build        # Next.js production build (static export consumed by the plugin)
 pnpm start        # serve the production build (port 18790)
 pnpm lint:check   # ESLint
 pnpm lint:fix     # ESLint --fix
@@ -91,7 +84,9 @@ The gateway protocol types are inlined into `src/lib/gateway/types.ts` because O
 
 ## Deployment
 
-This package is configured for Cloudflare Workers via [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) (see `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc`). Deployment scripts are intentionally not wired into the workspace yet — they will be added in a follow-up. For now, run them directly when needed:
+In the standard OpenClaw OS install, this package is built once and bundled into `@openuidev/openclaw-os-plugin/static/` — the gateway serves it directly. No separate deploy is required.
+
+If you want to host the workspace independently (for example on Cloudflare Workers), this package is also configured for [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) (see `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc`):
 
 ```bash
 pnpm exec opennextjs-cloudflare build
@@ -100,8 +95,8 @@ pnpm exec opennextjs-cloudflare deploy
 
 ## Troubleshooting
 
-- **Settings won't save** — the client persists settings to `localStorage`. Make sure third-party storage is enabled in your browser.
-- **Gateway connection fails** — verify the URL is reachable and the auth token is valid using `node scripts/connection-info.mjs` from the repo root.
+- **Settings won't save** — the standalone build persists settings to `localStorage`. Make sure third-party storage is enabled in your browser.
+- **Gateway connection fails** — verify the URL is reachable and the auth token is valid. `openclaw os url` (from the plugin) prints a known-good URL with the token already attached.
 - **Agent responds in plain text** — confirm `@openuidev/openclaw-os-plugin` is installed in the gateway and that the gateway has been restarted since install.
 
 ## License

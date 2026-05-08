@@ -39,7 +39,7 @@ Generative UI on this client uses \`openui-lang\` — a small assignment-based D
 ### \`openui-inline-ui\` — UI inside an assistant message
 Read \`skills/openui-inline-ui/SKILL.md\` BEFORE responding when any of these fire:
 - Chart, graph, plot, trend, comparison, breakdown, summary, table, KPI, metric — the user wants to *see* the answer.
-- Multi-field input ("plan a trip", "fill out X", "set up Y") → render a Form with FormControls + submit Button. Never a numbered question list.
+- Recommendation or advice request that needs 2+ preferences ("which X should I buy", "help me pick, "what's the best Y for me") → render a Form to collect preferences. Never a numbered question list.
 - Answer would exceed ~10 lines → wrap in \`SectionBlock([SectionItem(...)])\` accordion.
 - Suggesting next actions → end with \`FollowUpBlock([FollowUpItem(...)])\`.
 - Basically this will be very helpful for the user to directly interact with the UI instead of just reading or typing text, decreasing the cognitive load on the user.
@@ -254,6 +254,55 @@ export default definePluginEntry({
     });
     api.logger.info(
       `[openclaw-os-plugin] static UI route at ${ROUTE_PREFIX} (root=${STATIC_ROOT})`,
+    );
+
+    // ── CLI: `openclaw os url` ──────────────────────────────────────────────
+    api.registerCli(
+      ({ program, config }) => {
+        const group = program
+          .command("os")
+          .description("OpenClaw OS — Generative UI client controls");
+
+        group
+          .command("url")
+          .description("Print the OpenClaw OS setup URL with auth (gateway+token in fragment)")
+          .action(() => {
+            const port = config.gateway?.port ?? 18789;
+            const bind = config.gateway?.bind;
+            const customHost = config.gateway?.customBindHost;
+
+            // Host resolution. The browser is on the same machine as the gateway,
+            // so loopback works for every bind mode that listens on (or routes to)
+            // 127.0.0.1: loopback, lan (0.0.0.0), auto. For "custom" we honor
+            // the configured host; for "tailnet" we fall back but warn — the
+            // gateway may not also be bound to loopback.
+            let host = "127.0.0.1";
+            if (bind === "custom" && customHost) {
+              host = customHost;
+            } else if (bind === "tailnet") {
+              process.stderr.write(
+                "[openclaw-os] gateway.bind=tailnet detected — using 127.0.0.1 in the URL. " +
+                  "If the gateway isn't bound to loopback this URL will fail to connect.\n",
+              );
+            }
+
+            const tokenInput = config.gateway?.auth?.token;
+            if (typeof tokenInput !== "string" || !tokenInput) {
+              const reason =
+                tokenInput == null
+                  ? "gateway.auth.token is missing"
+                  : "gateway.auth.token is a SecretRef — resolve it first or set a plain string";
+              throw new Error(`${reason}. Run \`openclaw onboard\` to set one.`);
+            }
+
+            const gw = encodeURIComponent(`ws://${host}:${port}`);
+            const tk = encodeURIComponent(tokenInput);
+            process.stdout.write(
+              `http://${host}:${port}${ROUTE_PREFIX}/setup#gateway=${gw}&token=${tk}\n`,
+            );
+          });
+      },
+      { commands: ["os"] },
     );
 
     // ── Tiny preamble injection ──────────────────────────────────────────────

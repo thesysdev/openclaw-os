@@ -513,7 +513,10 @@ export function AssistantMessage({ message }: Props) {
     }
   }, [contextString]);
 
-  const toolCalls = message.toolCalls ?? [];
+  // Stabilize the empty-fallback so dependent useMemos don't re-run on every
+  // render when message.toolCalls is undefined (a fresh `[]` literal would
+  // change reference identity).
+  const toolCalls = useMemo(() => message.toolCalls ?? [], [message.toolCalls]);
   const toolCallById = useMemo(
     () => new Map(toolCalls.map((toolCall) => [toolCall.id, toolCall])),
     [toolCalls],

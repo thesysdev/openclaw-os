@@ -13,7 +13,19 @@ import type { ActionEvent } from "@openuidev/react-lang";
 import { Renderer } from "@openuidev/react-lang";
 import { Callout } from "@openuidev/react-ui";
 import { openuiLibrary } from "@openuidev/react-ui/genui-lib";
-import { Bug, Code2, Eye, Pin, Sparkles, Trash2, X } from "lucide-react";
+import {
+  Bug,
+  Check,
+  Code2,
+  Copy,
+  Eye,
+  Maximize2,
+  Pin,
+  RotateCw,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppDebugPanel } from "./AppDebugPanel";
 import { useToolInvocationLog } from "./useToolInvocationLog";
@@ -69,6 +81,10 @@ interface Props {
   onCustomize?: (record: AppRecord) => void;
   /** Share action. */
   onShare?: (record: AppRecord) => void;
+  /** Open this app in its standalone fullscreen route. Wired only by the
+   *  in-chat sidepane caller — when set, panel mode renders a "fullscreen"
+   *  button that mirrors how Refine sends the user to a thread. */
+  onFullscreen?: (record: AppRecord) => void;
   mode?: "page" | "panel";
   /** Peers shown in the title switcher dropdown. */
   siblings?: TitleSwitcherItem[];
@@ -88,6 +104,7 @@ export function AppDetail({
   onClose,
   onCustomize,
   onShare,
+  onFullscreen,
   mode = "page",
   siblings,
   onSwitch,
@@ -103,11 +120,14 @@ export function AppDetail({
   // Bumped to force a refetch without `window.location.reload()` — keeps the
   // surrounding React tree (other open chats, scroll positions) intact.
   const [refreshTick, setRefreshTick] = useState(0);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   // Captures the latest reactive state from the Renderer so @ToAssistant
   // actions can prefix the user's message with what the app was showing.
   const stateRef = useRef<Record<string, unknown>>({});
   const toolLog = useToolInvocationLog();
+  // `toolLog` itself is a fresh object every render; its callbacks are stable.
+  const { record: recordToolEntry, updateStatus: updateToolStatus } = toolLog;
 
   useEffect(() => {
     setLoading(true);
@@ -165,11 +185,11 @@ export function AppDetail({
       args: Record<string, unknown>,
     ): Promise<unknown> => {
       const startedAt = Date.now();
-      const entryId = toolLog.record({ toolName, args, startedAt });
+      const entryId = recordToolEntry({ toolName, args, startedAt });
       try {
         const result = await apps.invokeTool(toolName, args, record?.sessionKey);
         const normalized = normalizeToolResult(result);
-        toolLog.updateStatus(entryId, {
+        updateToolStatus(entryId, {
           result: normalized,
           status: "ok",
           finishedAt: Date.now(),
@@ -177,7 +197,7 @@ export function AppDetail({
         return normalized;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        toolLog.updateStatus(entryId, {
+        updateToolStatus(entryId, {
           error: message,
           status: "error",
           finishedAt: Date.now(),
@@ -192,7 +212,7 @@ export function AppDetail({
       db_query: async (args: Record<string, unknown>) => invokeScopedTool("db_query", args),
       db_execute: async (args: Record<string, unknown>) => invokeScopedTool("db_execute", args),
     };
-  }, [apps, record?.sessionKey, toolLog]);
+  }, [apps, record?.sessionKey, recordToolEntry, updateToolStatus]);
 
   if (loading) {
     return (
@@ -259,6 +279,36 @@ export function AppDetail({
             >
               Debug
             </Button>
+            <IconButton
+              icon={RotateCw}
+              variant="tertiary"
+              size="md"
+              title="Refresh"
+              onClick={() => setRefreshTick((t) => t + 1)}
+            />
+            {viewMode === "code" ? (
+              <IconButton
+                icon={codeCopied ? Check : Copy}
+                variant="tertiary"
+                size="md"
+                title={codeCopied ? "Copied" : "Copy code"}
+                onClick={() => {
+                  void navigator.clipboard.writeText(record.content).then(() => {
+                    setCodeCopied(true);
+                    window.setTimeout(() => setCodeCopied(false), 1500);
+                  });
+                }}
+              />
+            ) : null}
+            {onFullscreen ? (
+              <IconButton
+                icon={Maximize2}
+                variant="tertiary"
+                size="md"
+                title="Open fullscreen"
+                onClick={() => onFullscreen(record)}
+              />
+            ) : null}
             {onTogglePinned && (
               <Button
                 variant={isPinned ? "secondary" : "tertiary"}

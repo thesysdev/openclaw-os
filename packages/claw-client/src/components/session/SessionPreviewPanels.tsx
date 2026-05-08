@@ -20,6 +20,23 @@ import {
 import { ArtifactPanel } from "@openuidev/react-ui";
 import { useEffect, useMemo, useState } from "react";
 
+// Text-like kinds need the *decoded* file body as the renderer's `content`
+// (ReactMarkdown / a `<pre>` will otherwise display the raw `data:...` URL
+// verbatim). Image/PDF/HTML kinds want the data URL as-is so `<img>` /
+// `<iframe>` can consume it directly.
+const TEXT_KINDS = new Set(["markdown", "text", "code"]);
+
+function decodeBase64ToText(base64: string): string {
+  try {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch {
+    return "";
+  }
+}
+
 export function UploadPreviewPanel({
   upload,
   uploadStore,
@@ -27,27 +44,42 @@ export function UploadPreviewPanel({
   upload: ThreadUpload;
   uploadStore?: UploadStore;
 }) {
+  // For text/markdown/code/html we keep the decoded body; for binary previews
+  // we keep a `data:` URL the renderer can hand to `<img>`/`<iframe>`.
+  const [fetchedText, setFetchedText] = useState<string | null>(null);
   const [fetchedDataUrl, setFetchedDataUrl] = useState<string | null>(null);
 
-  const immediatePreview = upload.textContent ?? upload.previewUrl ?? null;
+  const immediateText = upload.textContent ?? null;
+  const immediatePreviewUrl = upload.previewUrl ?? null;
 
   useEffect(() => {
     // Always drop prior fetched bytes first so a panel that was remounted with
     // a different upload id can't flash the previous file's preview.
+    setFetchedText(null);
     setFetchedDataUrl(null);
-    if (immediatePreview) return;
+    if (immediateText || immediatePreviewUrl) return;
     if (!uploadStore || !upload.remoteId) return;
     let cancelled = false;
     void uploadStore.getUpload(upload.remoteId).then((record) => {
       if (cancelled || !record) return;
-      setFetchedDataUrl(`data:${record.mimeType};base64,${record.content}`);
+      if (TEXT_KINDS.has(upload.kind)) {
+        setFetchedText(decodeBase64ToText(record.content));
+      } else {
+        setFetchedDataUrl(`data:${record.mimeType};base64,${record.content}`);
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [immediatePreview, upload.remoteId, uploadStore]);
+  }, [immediateText, immediatePreviewUrl, upload.kind, upload.remoteId, uploadStore]);
 
-  const content = immediatePreview ?? fetchedDataUrl;
+  const isTextKind = TEXT_KINDS.has(upload.kind);
+  const textBody = immediateText ?? (isTextKind ? fetchedText : null);
+  const previewSource = immediatePreviewUrl ?? (isTextKind ? null : fetchedDataUrl);
+  // For text kinds the renderer needs the decoded body as `content`; for
+  // binary kinds it consumes the data URL via `metadata.previewUrl` (the
+  // image/pdf branches read `previewUrl`).
+  const content = textBody ?? previewSource;
 
   return (
     <ArtifactContentView
@@ -57,7 +89,7 @@ export function UploadPreviewPanel({
       metadata={{
         fileName: upload.name,
         mimeType: upload.mimeType,
-        previewUrl: content ?? undefined,
+        previewUrl: previewSource ?? undefined,
         size: upload.size,
         status: upload.status,
       }}

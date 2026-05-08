@@ -167,6 +167,19 @@ export function mergeHistoryMessages(raw: ChatHistoryMessage[]): MergedMessage[]
       // consecutive `/status` runs would fuse into one bubble.
       const isGatewayInjected = (m as unknown as { model?: string }).model === "gateway-injected";
       if (isGatewayInjected) {
+        // Run-abort snapshots: the gateway also persists the buffered partial
+        // as a `gateway-injected` message tagged `openclawAbort` whenever a
+        // run is aborted (chat-transcript-inject.ts:96). The previous
+        // assistant message already carries that partial in our merged view,
+        // so emitting the snapshot would double-render the same content as a
+        // "Gateway"-tagged duplicate. Drop the snapshot and let the existing
+        // assistant message stand on its own.
+        const isAbortSnapshot = Boolean(
+          (m as unknown as { openclawAbort?: { aborted?: boolean } }).openclawAbort?.aborted,
+        );
+        if (isAbortSnapshot) {
+          continue;
+        }
         flush();
         const text = extractText(m.content);
         if (text) {

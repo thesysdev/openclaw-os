@@ -9,7 +9,7 @@ import { TextTile } from "@/components/layout/sidebar/Tile";
 import { Button } from "@/components/ui/Button";
 import type { ArtifactRecord, ArtifactStore } from "@/lib/engines/types";
 import { artifactsHash } from "@/lib/hooks/useHashRoute";
-import { Sparkles, Trash2, X } from "lucide-react";
+import { Check, Copy, Maximize2, RotateCw, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface Props {
@@ -22,6 +22,10 @@ interface Props {
   onCustomize?: (record: ArtifactRecord) => void;
   onShare?: (record: ArtifactRecord) => void;
   onRefine?: (record: ArtifactRecord) => void | Promise<void>;
+  /** Open this artifact in its standalone fullscreen route. Wired only by
+   *  the in-chat sidepane caller — when set, panel mode renders a
+   *  "fullscreen" button. */
+  onFullscreen?: (record: ArtifactRecord) => void;
   /** Peers shown in the title switcher dropdown. */
   siblings?: TitleSwitcherItem[];
   /** Called when the user picks a different peer from the title dropdown. */
@@ -38,6 +42,7 @@ export function ArtifactDetail({
   onCustomize,
   onShare,
   onRefine,
+  onFullscreen,
   siblings,
   onSwitch,
 }: Props) {
@@ -48,6 +53,7 @@ export function ArtifactDetail({
   const [deleting, setDeleting] = useState(false);
   // Bumped to force a refetch without `window.location.reload()`.
   const [refreshTick, setRefreshTick] = useState(0);
+  const [contentCopied, setContentCopied] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -156,6 +162,34 @@ export function ArtifactDetail({
       <TopBar
         actions={
           <>
+            <IconButton
+              icon={RotateCw}
+              variant="tertiary"
+              size="md"
+              title="Refresh"
+              onClick={() => setRefreshTick((t) => t + 1)}
+            />
+            <IconButton
+              icon={contentCopied ? Check : Copy}
+              variant="tertiary"
+              size="md"
+              title={contentCopied ? "Copied" : "Copy content"}
+              onClick={() => {
+                void navigator.clipboard.writeText(contentDisplay).then(() => {
+                  setContentCopied(true);
+                  window.setTimeout(() => setContentCopied(false), 1500);
+                });
+              }}
+            />
+            {onFullscreen ? (
+              <IconButton
+                icon={Maximize2}
+                variant="tertiary"
+                size="md"
+                title="Open fullscreen"
+                onClick={() => onFullscreen(record)}
+              />
+            ) : null}
             {onRefine ? (
               <Button
                 variant="tertiary"

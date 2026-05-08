@@ -1,12 +1,15 @@
 "use client";
 
 import { separateContentAndContext } from "@/lib/content-parser";
-import { extractMessageUploadIds, sessionUploadPreviewId } from "@/lib/session-workspace";
+import {
+  extractMessageUploadIds,
+  inferWorkspacePreviewKind,
+  sessionUploadPreviewId,
+} from "@/lib/session-workspace";
 import { useUploadMeta, useUploadPreview } from "@/lib/uploads-context";
 import type { UserMessage as UserMsg } from "@openuidev/react-headless";
 import { useArtifactStore } from "@openuidev/react-headless";
-import { ArtifactPanel } from "@openuidev/react-ui";
-import { ChevronDown, FileArchive, FileCode2, FileImage, FileText, X } from "lucide-react";
+import { ChevronDown, FileArchive, FileCode2, FileImage, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 
 function FormDataAccordion({ contextString }: { contextString: string }) {
@@ -41,10 +44,9 @@ function FormDataAccordion({ contextString }: { contextString: string }) {
   );
 }
 
-function kindIcon(kind: string | undefined) {
+function kindIcon(kind: string): React.ComponentType<{ className?: string }> {
   switch (kind) {
     case "code":
-    case "html":
       return FileCode2;
     case "image":
       return FileImage;
@@ -57,43 +59,40 @@ function kindIcon(kind: string | undefined) {
   }
 }
 
-function inferKindFromMime(mimeType: string | undefined): string {
-  if (!mimeType) return "file";
-  if (mimeType.startsWith("image/")) return "image";
-  if (mimeType === "application/pdf") return "pdf";
-  if (mimeType === "text/html") return "html";
-  if (
-    mimeType.startsWith("text/") ||
-    mimeType === "application/json" ||
-    mimeType === "application/xml" ||
-    mimeType === "application/javascript"
-  )
-    return "text";
-  return "file";
-}
+// Kinds whose preview panel actually shows something useful. Anything else
+// (`file` — the catch-all for binary blobs we don't decode) renders the chip
+// as a non-interactive label so we don't open an empty/garbage panel.
+const PREVIEWABLE_KINDS: ReadonlySet<string> = new Set([
+  "image",
+  "pdf",
+  "markdown",
+  "text",
+  "code",
+  "ppt",
+]);
 
-function decodeBase64Text(dataUrl: string): string {
-  try {
-    const base64 = dataUrl.split(",")[1] ?? "";
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-    return new TextDecoder("utf-8").decode(bytes);
-  } catch {
-    return "";
-  }
+function isPreviewable(kind: string): boolean {
+  return PREVIEWABLE_KINDS.has(kind);
 }
 
 function InlineUploadChip({ remoteId }: { remoteId: string }) {
   const meta = useUploadMeta(remoteId);
   const dataUrl = useUploadPreview(remoteId);
-  const kind = inferKindFromMime(meta?.mimeType);
+  // Match the workspace's kind so the chip's previewable-ness lines up with
+  // whether `ThreadArtifactPanels` will register a panel.
+  const kind = meta ? inferWorkspacePreviewKind(meta.name, meta.mimeType) : "file";
   const Icon = kindIcon(kind);
   const name = meta?.name ?? "Attachment";
   const artifactStore = useArtifactStore();
   const previewId = sessionUploadPreviewId(remoteId);
+  // Default to clickable while meta is still loading — flipping the chip
+  // from static-div to button on meta arrival is a worse UX than briefly
+  // showing a clickable placeholder. ThreadArtifactPanels filters
+  // `kind === "file"` from `workspace.uploads` (which is set at `addFiles`
+  // / history-load time, not bound to meta hydration), so a click during
+  // the loading window is a no-op for binaries — no empty panel opens.
+  const previewable = !meta || isPreviewable(kind);
   const openArtifact = () => artifactStore.getState().openArtifact(previewId);
-  const closeArtifact = () => artifactStore.getState().closeArtifact(previewId);
 
   // If this chip unmounts (message scrolls out of a virtualised list, thread
   // swap, etc.) while its preview is open, the artifactStore would otherwise
@@ -110,81 +109,32 @@ function InlineUploadChip({ remoteId }: { remoteId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewId]);
 
-  // Co-located ArtifactPanel registration: data comes from the same hooks the
-  // thumbnail uses, so the fullscreen preview is available the instant the
-  // user picks the file — no race with thread-workspace state during the
-  // first streaming run.
-  const panel = (
-    <ArtifactPanel artifactId={previewId} title={name} header={false}>
-      <div className="flex h-full flex-col bg-background dark:bg-sunk">
-        <div className="flex items-center justify-between border-b border-border-default/60 px-ml py-s">
-          <span className="truncate font-label text-md font-medium text-text-neutral-primary">
-            {name}
-          </span>
-          <button
-            type="button"
-            onClick={closeArtifact}
-            className="rounded-m p-2xs text-text-neutral-tertiary hover:bg-sunk-light hover:text-text-neutral-primary"
-            title="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="flex min-h-0 flex-1 items-stretch justify-stretch overflow-auto bg-sunk-light dark:bg-sunk-deep">
-          {!dataUrl ? (
-            <div className="m-auto p-l text-sm text-text-neutral-tertiary">Loading preview…</div>
-          ) : kind === "image" ? (
-            <div className="m-auto p-l">
-              <img src={dataUrl} alt={name} className="max-h-full max-w-full object-contain" />
-            </div>
-          ) : kind === "pdf" ? (
-            <iframe src={dataUrl} title={name} className="h-full w-full border-0 bg-background" />
-          ) : kind === "html" ? (
-            // Sandbox the iframe so uploaded HTML can't run scripts or
-            // navigate the parent. `srcdoc` is preferred over `src=dataUrl`
-            // because Chrome strips data: URL navigation in some setups.
-            <iframe
-              srcDoc={decodeBase64Text(dataUrl)}
-              title={name}
-              sandbox=""
-              className="h-full w-full border-0 bg-white"
-            />
-          ) : kind === "text" ? (
-            <pre className="m-0 h-full w-full overflow-auto whitespace-pre p-l font-code text-sm leading-body text-text-neutral-primary">
-              {decodeBase64Text(dataUrl)}
-            </pre>
-          ) : (
-            <div className="m-auto p-l text-sm text-text-neutral-tertiary">
-              {meta?.mimeType ?? "Attachment"} — preview not available
-            </div>
-          )}
-        </div>
-      </div>
-    </ArtifactPanel>
-  );
+  // Note: the in-thread `<ArtifactPanel>` registration for this upload is
+  // owned by `ThreadArtifactPanels` (driven by `workspace.uploads`). We must
+  // NOT register a second panel with the same `previewId` here, otherwise
+  // both panels portal into the active artifact target and the user sees the
+  // file rendered twice. The chip is just a thumbnail/click affordance.
 
   if (kind === "image" && dataUrl) {
     return (
-      <>
-        <button
-          type="button"
-          className="group relative overflow-hidden rounded-xl border border-border-default bg-background shadow-sm transition-transform hover:scale-[1.02]"
-          onClick={openArtifact}
-          title={name}
-        >
-          <img src={dataUrl} alt={name} className="block h-24 w-24 object-cover" />
-        </button>
-        {panel}
-      </>
+      <button
+        type="button"
+        className="group relative overflow-hidden rounded-xl border border-border-default bg-background shadow-sm transition-transform hover:scale-[1.02]"
+        onClick={openArtifact}
+        title={name}
+      >
+        <img src={dataUrl} alt={name} className="block h-24 w-24 object-cover" />
+      </button>
     );
   }
 
-  return (
-    <>
-      <button
-        type="button"
-        className="inline-flex items-center gap-2 rounded-xl border border-border-default bg-background px-3 py-2 text-left text-sm shadow-sm transition-colors hover:bg-sunk-light"
-        onClick={openArtifact}
+  // Non-previewable kinds render as a static `<div>` — no `onClick`, no
+  // hover/cursor affordance — so the user can still see what was attached
+  // without opening a placeholder panel that has nothing useful to show.
+  if (!previewable) {
+    return (
+      <div
+        className="inline-flex items-center gap-2 rounded-xl border border-border-default bg-background px-3 py-2 text-left text-sm shadow-sm"
         title={name}
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-text-neutral-secondary">
@@ -198,9 +148,29 @@ function InlineUploadChip({ remoteId }: { remoteId: string }) {
             </span>
           ) : null}
         </span>
-      </button>
-      {panel}
-    </>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="inline-flex items-center gap-2 rounded-xl border border-border-default bg-background px-3 py-2 text-left text-sm shadow-sm transition-colors hover:bg-sunk-light"
+      onClick={openArtifact}
+      title={name}
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-text-neutral-secondary">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="flex max-w-[180px] flex-col">
+        <span className="truncate text-sm font-medium text-text-neutral-primary">{name}</span>
+        {meta?.mimeType ? (
+          <span className="truncate text-sm uppercase tracking-wide text-text-neutral-tertiary">
+            {meta.mimeType}
+          </span>
+        ) : null}
+      </span>
+    </button>
   );
 }
 
