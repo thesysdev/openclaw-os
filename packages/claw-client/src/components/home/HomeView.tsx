@@ -29,6 +29,7 @@ import { relTime } from "@/lib/time";
 import type { ClawThread } from "@/types/claw-thread";
 
 import { Greeting } from "./Greeting";
+import { HeroBanner } from "./HeroBanner";
 import { HomeRow } from "./HomeRow";
 import { SectionHeader } from "./SectionHeader";
 import { NotifPanel } from "./notif/NotifPanel";
@@ -208,6 +209,7 @@ export function HomeView({
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1080px] px-3xl pb-l pt-3xl">
             <Greeting name={userName} />
+            <HeroBanner />
 
             {/* Top agents */}
             <section className="mb-2xl">

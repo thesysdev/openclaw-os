@@ -13,6 +13,7 @@ import { useMemo } from "react";
 
 import { AgentCard, type AgentCardData } from "@/components/cards/AgentCard";
 import { Greeting } from "@/components/home/Greeting";
+import { MobileHeroBanner } from "@/components/home/HeroBanner";
 import type { HomeViewProps } from "@/components/home/HomeView";
 import { SectionHeader } from "@/components/home/SectionHeader";
 import { MobileButton } from "@/components/mobile/MobileButton";
@@ -100,6 +101,7 @@ export function MobileHomeView({
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1080px] px-ml pb-ml pt-ml">
           <Greeting name={userName} />
+          <MobileHeroBanner />
 
           <section className="mb-ml">
             <SectionHeader title="Top agents" />
