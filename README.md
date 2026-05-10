@@ -94,6 +94,7 @@ openclaw-os/
 ├── packages/
 │   ├── claw-client/      # Workspace UI (Next.js, statically exported)
 │   └── claw-plugin/      # OpenClaw plugin (bundles + serves the UI)
+├── examples/              # Standalone prototypes and demos
 ├── scripts/              # Local helpers (open dashboard, etc.)
 ├── .github/              # CI workflows + issue / PR templates
 ├── AGENTS.md             # Protocol and mental-model deep dive
@@ -105,6 +106,7 @@ Good places to start:
 
 - [`packages/claw-client`](./packages/claw-client) — the workspace UI
 - [`packages/claw-plugin`](./packages/claw-plugin) — the plugin that ships and serves it
+- [`examples/marble-pachinko-sim`](./examples/marble-pachinko-sim) — a local marble pachinko simulator prototype
 - [`AGENTS.md`](./AGENTS.md) — gateway protocol & session model
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — local setup, code style, PR workflow
 
