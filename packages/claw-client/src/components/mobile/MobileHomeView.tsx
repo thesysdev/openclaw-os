@@ -13,7 +13,12 @@ import { useMemo } from "react";
 
 import { AgentCard, type AgentCardData } from "@/components/cards/AgentCard";
 import { Greeting } from "@/components/home/Greeting";
-import type { HomeViewProps } from "@/components/home/HomeView";
+import {
+  APP_EXAMPLE_PROMPT,
+  ARTIFACT_EXAMPLE_PROMPT,
+  primeComposer,
+  type HomeViewProps,
+} from "@/components/home/HomeView";
 import { SectionHeader } from "@/components/home/SectionHeader";
 import { MobileButton } from "@/components/mobile/MobileButton";
 import { MobileCronRow } from "@/components/mobile/MobileCronRow";
@@ -131,8 +136,12 @@ export function MobileHomeView({
                   <br />
                   work trackers, marketing calendars, etc.
                 </p>
-                <Button variant="secondary" size="md">
-                  See an example
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={() => primeComposer(APP_EXAMPLE_PROMPT, true)}
+                >
+                  Create an example
                 </Button>
               </div>
             ) : (
@@ -163,8 +172,12 @@ export function MobileHomeView({
                   <br />
                   slides and reports.
                 </p>
-                <Button variant="secondary" size="md">
-                  See an example
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={() => primeComposer(ARTIFACT_EXAMPLE_PROMPT, true)}
+                >
+                  Create an example
                 </Button>
               </div>
             ) : (
