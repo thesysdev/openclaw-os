@@ -1,6 +1,8 @@
 <div align="center">
 
+<a href="https://www.openui.com/openclaw-os" target="_blank" rel="noopener noreferrer">
 <img src="./assets/openclaw-os-hero.png" alt="OpenClaw OS — the workspace for OpenClaw" width="100%">
+</a>
 
 # OpenClaw OS — The default workspace for OpenClaw
 
@@ -10,13 +12,28 @@
 
 </div>
 
-OpenClaw can read emails, manage files, run scripts, schedule work, and operate across tools — but most people are still driving it from Telegram threads, Discord channels, or Slack DMs. Once an agent starts doing real work, chat falls apart: everything turns into a scroll, work gets buried, and you can't see what the agent is doing or what's already done.
+OpenClaw reads emails, manages files, runs scripts, and schedules work across tools. But people drive it from Telegram, Discord, or Slack. Chat falls apart fast: everything scrolls away, work gets buried, and you can't see what's running or done.
 
-**OpenClaw OS is the missing interface.** A dedicated, purpose-built workspace for your OpenClaw agents. Sessions are visually organized and easy to revisit. Agents render their answers as live, interactive apps — charts, tables, forms, dashboards — instead of plain text. Those apps are persistent: they stay in place, update with fresh data, and you refine them with a prompt instead of rebuilding from scratch.
+**OpenClaw-OS** is the missing interface. A workspace built for your agents. Sessions stay organized. Answers render as live, interactive apps (charts, tables, forms, dashboards) that persist, refresh with new data, and update from a prompt instead of a rebuild.
 
 ---
 
 [Website](https://openui.com/openclaw-os) · [OpenUI Docs](https://openui.com) · [OpenClaw](https://github.com/openclaw/openclaw) · [Discord](https://discord.com/invite/Pbv5PsqUSv) · [Contributing](./CONTRIBUTING.md) · [Code of Conduct](./CODE_OF_CONDUCT.md) · [Security](./SECURITY.md) · [License](./LICENSE)
+
+---
+## Quick Start
+
+Install OpenClaw OS into an existing OpenClaw setup with one command:
+
+```bash
+curl -fsSL https://openui.com/openclaw-os/install.sh | bash
+```
+
+The installer downloads the source, builds the workspace UI, registers it as an OpenClaw plugin, restarts the gateway, and opens the dashboard in your browser.
+
+> Don't have OpenClaw yet? Install it first from [openclaw.ai](https://openclaw.ai/install.sh), then run the command above.
+>
+> Installing from a local clone: see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ---
 
@@ -31,27 +48,7 @@ OpenClaw can read emails, manage files, run scripts, schedule work, and operate 
 
 ---
 
-## Quick Start
 
-Install OpenClaw OS into an existing OpenClaw setup with one command:
-
-```bash
-curl -fsSL https://openui.com/openclaw-os/install.sh | bash
-```
-
-The installer downloads the source, builds the workspace UI, registers it as an OpenClaw plugin, restarts the gateway, and opens the dashboard in your browser.
-
-To uninstall later:
-
-```bash
-curl -fsSL https://openui.com/openclaw-os/install.sh | bash -s -- uninstall
-```
-
-> Don't have OpenClaw yet? Install it first from [openclaw.ai](https://openclaw.ai/install.sh), then run the command above.
->
-> Installing from a local clone: see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
-
----
 
 ## How it works
 
