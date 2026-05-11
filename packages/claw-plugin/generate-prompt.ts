@@ -1,8 +1,9 @@
 /**
  * Build script — emits the artifacts the plugin needs at runtime:
  *
- *   skills/openui-app/SKILL.md               — durable apps (Query/Mutation/$state)
- *   skills/openui-inline-ui/SKILL.md         — inline UI in chat replies (static)
+ *   skills/openui-app/SKILL.md               — durable apps (Query/Mutation/$state); a real skill
+ *   prompts/openui-inline-ui.md              — inline UI in chat replies (static); inlined into the
+ *                                              Claw system prompt by src/index.ts, NOT a skill
  *   src/generated/openui-schema.json         — drives the lint loop in lint-openui.ts
  *
  * Re-run with `pnpm generate` whenever @openuidev/react-ui changes its
@@ -31,15 +32,18 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const generatedDir = join(__dirname, "src", "generated");
 const skillsDir = join(__dirname, "skills");
+const promptsDir = join(__dirname, "prompts");
 
 mkdirSync(generatedDir, { recursive: true });
-mkdirSync(join(skillsDir, "openui-inline-ui"), { recursive: true });
+mkdirSync(promptsDir, { recursive: true });
 mkdirSync(join(skillsDir, "openui-app"), { recursive: true });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. openui-inline-ui skill — inline UI in a chat reply.
+// 1. openui-inline-ui prompt — inline UI in a chat reply.
 //    Static surface only: no Query, no Mutation, no $variables, no builtins,
 //    no filters. Just component signatures + Action({@ToAssistant, @OpenUrl}).
+//    Written as a plain prompt file (no frontmatter): src/index.ts reads it at
+//    startup and inlines it into the Claw system prompt. It is NOT a skill.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CHAT_PREAMBLE = `You are rendering generative UI inline in a chat reply, using a small DSL called openui-lang.
@@ -83,7 +87,9 @@ COMMON MISTAKES (the renderer drops them or shows broken UI):
 - AccordionItem same — three args, content array
 - "col" direction                    → "column" (or omit; column is the default)
 - @Map(rows, ...)                    → there is no @Map in chat (no live data anyway). Just inline literal arrays.
-- Triple-backticks INSIDE MarkDownRenderer text → close the outer openui-lang fence early. NEVER nest triple-backticks. Use single backticks or describe code in prose.`;
+- Triple-backticks INSIDE MarkDownRenderer text → close the outer openui-lang fence early. NEVER nest triple-backticks. Use single backticks or describe code in prose.
+
+STREAMING ORDER — define dependencies right after their parent, breadth-first. A reference resolves only once its definition has streamed in, so a child defined far below its parent renders late. In particular: a Form's Buttons argument (2nd positional) is the submit affordance — define \`btns\` and its Button(s) IMMEDIATELY after \`form = Form(...)\`, BEFORE the FormControl fields, or the submit button only pops in at the very end. Same for any container: \`Card([a, b])\` → define \`a\`, then \`b\`, then their internals. Don't push all leaf definitions to the bottom.`;
 
 // `inlineMode: true` would inject upstream's "## Inline Mode" block, which
 // talks about patching existing UI — concept doesn't apply to chat replies
@@ -113,30 +119,16 @@ const chatPrompt = chatPromptRaw
   // `value?: $binding<string>` → `value?: string` on signatures.
   .replace(/\$binding<([^>]+)>/g, "$1");
 
-// `always: true` forces openclaw to inline this skill into every system
-// prompt for Claw sessions. Without it, skills are read-on-demand and the
-// model — left to its own judgment — almost always picks plain text over
-// openui-lang for chart/table/comparison/form requests, which is the
-// product's whole point. The inline-UI skill is small (~6 KB), so
-// always-loading it is worth the prompt-budget cost.
-//
-// `description` leads with the routing decision (when to pick this skill vs
-// openui-app). The negative-scope sentence ("STATIC ONLY...") prevents the
-// agent from reaching for $state / Query / Mutation here.
-const CHAT_FRONTMATTER = `---
-name: openui-inline-ui
-description: Render generative UI inside a chat reply using openui-lang fenced code. Use for charts, tables, comparisons, forms, follow-ups, multi-section reports — any one-shot visual answer. STATIC ONLY: no $state, no Query, no Mutation, no live data. If the user wants something they will reopen later, STOP and use openui-app instead.
-always: true
----
-
-`;
-
+// Plain prompt file — NO YAML frontmatter. This is not a skill: src/index.ts
+// reads prompts/openui-inline-ui.md at startup and inlines the whole thing into
+// the Claw system prompt via the `before_prompt_build` hook. (Auto-injecting it
+// as an `always: true` skill too would just duplicate ~250 lines per session.)
 writeFileSync(
-  join(skillsDir, "openui-inline-ui", "SKILL.md"),
-  CHAT_FRONTMATTER + chatPrompt + "\n",
+  join(promptsDir, "openui-inline-ui.md"),
+  chatPrompt.trimEnd() + "\n",
   "utf8",
 );
-console.log(`✓ skills/openui-inline-ui/SKILL.md (${chatPrompt.length} chars)`);
+console.log(`✓ prompts/openui-inline-ui.md (${chatPrompt.length} chars)`);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. openui-app skill — durable apps with live data.

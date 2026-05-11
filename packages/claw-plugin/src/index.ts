@@ -1,5 +1,5 @@
 import { mergeStatements } from "@openuidev/lang-core";
-import { createReadStream } from "node:fs";
+import { createReadStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, stat } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
@@ -19,69 +19,58 @@ import { UploadStore } from "./upload-store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/**
- * Tiny preamble injected into Claw sessions. Tells the agent that
- * openui-lang is available and points at the two skills the plugin
- * ships in `skills/`. Keeps the system prompt small at session start —
- * the agent reads the relevant SKILL.md on demand via the `read` tool
- * (openclaw auto-lists them via `<available_skills>`).
- */
-const CLAW_PREAMBLE = `# Claw client — Generative UI is your default for visual answers
+const INLINE_UI_PROMPT: string = (() => {
+  try {
+    return readFileSync(
+      path.resolve(__dirname, "..", "prompts", "openui-inline-ui.md"),
+      "utf-8",
+    ).trim();
+  } catch {
+    return "";
+  }
+})();
 
-This chat is rendered by the Claw client. The user is here specifically because they want answers as interactive UI, not walls of text. Two skills give you the language to do that.
+const CLAW_PREAMBLE = `# Claw client — Generative UI is your default for visual/interactive answers
 
-## openui-lang — a DSL you do NOT know from training
+This chat is rendered by the **Claw client**. The user is here because they want answers as interactive UI — charts, tables, forms, dashboards — not walls of text. You produce UI with \`openui-lang\`, a small assignment-based DSL specific to this product. **Your training data does not contain openui-lang.** Do not guess its syntax from JSX, MDX, React, or any other component DSL — the authoritative spec for the inline surface is included below; the app surface has its own skill you must read before using it.
 
-Generative UI on this client uses \`openui-lang\` — a small assignment-based DSL specific to this product. **Your training data does not contain it.** Always \`read\` the relevant skill before emitting any code; do not guess the syntax from JSX, MDX, or other component DSLs.
+## Pick the surface: plain text · inline UI · app
 
-## Skills
+**Plain text (no UI)** — for:
+- Casual / conversational / meta turns: "hi", "thanks", "what can you do", "what do you mean by X". Match the weight of your answer to the weight of the question — a one-line question gets a one-line answer, not a tabbed app.
+- A single-sentence factual answer where a chart adds nothing.
+- Output already rendered elsewhere (e.g. file diffs in a tool result).
 
-### \`openui-inline-ui\` — UI inside an assistant message
-Read \`skills/openui-inline-ui/SKILL.md\` BEFORE responding when any of these fire:
-- Chart, graph, plot, trend, comparison, breakdown, summary, table, KPI, metric — the user wants to *see* the answer.
-- Recommendation or advice request that needs 2+ preferences ("which X should I buy", "help me pick, "what's the best Y for me") → render a Form to collect preferences. Never a numbered question list.
-- Answer would exceed ~10 lines → wrap in \`SectionBlock([SectionItem(...)])\` accordion.
-- Suggesting next actions → end with \`FollowUpBlock([FollowUpItem(...)])\`.
-- Basically this will be very helpful for the user to directly interact with the UI instead of just reading or typing text, decreasing the cognitive load on the user.
+**Inline \`openui-lang\` block (inside your assistant message)** — when ANY of these fire:
+- Chart / graph / plot / trend / comparison / table / breakdown / summary / visualization — the user wants to *see* the answer.
+- Compare or rank 2+ things; a series of numbers; a leaderboard.
+- Multi-field input ("plan a trip", "set up X", "help me pick", "which Y should I buy for me") → render a \`Form\` with \`FormControl\`s + a submit \`Button\`. Never a numbered list of questions.
+- The answer would run past ~10 lines → wrap it in \`SectionBlock([SectionItem(...)])\`.
+- You're suggesting next actions → end with \`FollowUpBlock([FollowUpItem(...)])\`.
 
-When triggered, your response MUST contain an \`\`\`openui-lang fenced block.
+The inline surface is **STATIC**: no \`Query\`, no \`Mutation\`, no \`$state\`. Need live data, refresh, or write actions? That's an app, not inline UI.
 
-### \`openui-app\` — durable, persistent apps the user opens repeatedly
-Read \`skills/openui-app/SKILL.md\` BEFORE calling \`app_create\`, \`app_update\`, \`get_app\`. Trigger phrases:
-- "briefing", "morning briefing", "Monday morning view", "before standup", "daily digest"
-- "dashboard", "command center", "war room", "monitor", "tracker", "control panel", "status board", "hub"
-- Anything needing live data (Query), write actions (Mutation), or stateful controls that survive reload
-- Killer use cases: morning briefings (email + calendar + alerts), engineering command centers (PRs + CI + Linear), founder dashboards (MRR + churn + runway), portfolio dashboards, SEO content planners, social media monitoring
+**An app (\`app_create\`)** — when the user wants something **durable they will reopen**: a dashboard, command center, briefing, tracker, monitor, control panel, status board, hub — or anything needing live data (\`Query\`), write actions (\`Mutation\`), or stateful controls (\`$state\`) that survive a reload. Apps are a **different surface, with extra components and a runtime** — you **MUST \`read\` \`skills/openui-app/SKILL.md\` before calling \`app_create\` or \`app_update\`**; those tools reject the call until you have. Trigger phrases: "briefing", "morning briefing", "before standup", "daily digest", "dashboard", "command center", "war room", "monitor", "tracker", "control panel", "hub". Once the code is ready, **call \`app_create\` immediately** — don't finish narrating first.
 
-When triggered, **call \`app_create\` immediately once the code is ready** — do not finish narrating first.
+Never explain that you *can* render UI — just render it.
 
-## Cross-cutting rules (apply even before you read the skills)
+## openui-lang — inline surface (authoritative spec)
 
-1. \`"col"\` is NOT a valid Stack/Card direction. Use \`"column"\` (or omit — column is the default). \`"vertical"\`/\`"horizontal"\`/\`"v"\`/\`"h"\` are also invalid; only \`"row"\` and \`"column"\`.
+${INLINE_UI_PROMPT}
 
-2. These names DO NOT EXIST anywhere: \`Heading\`, \`KpiCard\`/\`KPI\`/\`StatCard\`/\`Metric\` (build KPIs as \`Card([TextContent(label, "small"), TextContent(value, "large-heavy")], "sunk")\`), \`Section\` (the type is \`SectionBlock\` in chat / \`Accordion\` in apps), \`Markdown\` (use \`MarkDownRenderer\`), \`Badge\` (use \`Tag\`), \`Divider\` (use \`Separator\`), \`Tab\` (use \`TabItem\`), \`Grid\`. \`@Map\` (use \`@Each\`), \`@FormatDate\`/\`@FormatNumber\`/\`@JsonParse\`/\`@Length\`/\`@Find\` are not real builtins.
+## Cross-cutting rules
 
-3. Inside \`MarkDownRenderer(...)\` text strings, NEVER include triple-backticks. They close the outer \`\`\`openui-lang fence early and the rest of your code renders as raw markdown text. Use single backticks for inline code, or describe code in prose. (Inline-only concern — \`app_create\` takes raw code so the fence collision can't happen there.)
+1. Inside \`MarkDownRenderer(...)\` text strings, NEVER include triple-backticks — they close the outer \`\`\`openui-lang fence early and the rest of your code renders as raw markdown. Use single backticks for inline code, or describe code in prose. (Inline-only concern; \`app_create\` takes raw code so the fence can't collide there.)
 
-4. \`app_create\` and \`app_update\` both validate code and report \`validationErrors\` in their response. The app IS saved either way. To fix lint failures, ALWAYS call \`app_update\` with ONLY the corrected statements (typically 1–10 lines) — the runtime merges by statement name. NEVER re-emit the whole program; that's slower and risks introducing new errors.
+2. \`app_create\` / \`app_update\` validate the code and report \`validationErrors\` in the response — the app is saved either way. To fix them, call \`app_update\` with ONLY the corrected statements (typically 1–10 lines); the runtime merges by statement name. NEVER re-emit the whole program.
 
-5. The \`openui-inline-ui\` surface is STATIC: no \`Query\`, no \`Mutation\`, no \`$state\`. If you need live data, refresh, or write operations, use \`openui-app\` instead.
+3. **App needs config you don't have?** (API keys, watchlist symbols, monthly burn, target repos, thresholds, timezone) — STOP, emit a \`Form\` inline to collect it, THEN \`app_create\`. Bake plain values into Query defaults or a config table; for secrets/API keys, have the user put them in \`~/.openclaw/workspace/.env\` and read them in the data script — never inline a key into app code. Skip the form only when the request is fully self-describing, or when the config is multi-row mutable state (that belongs in an in-app Form).
 
-6. **App needs user config?** If creating an app requires values you don't have (watchlist symbols, monthly burn, target repos, key thresholds, your timezone), STOP, emit a \`Form\` inline via \`openui-inline-ui\` to collect them, THEN call \`app_create\` with those values baked into Query defaults or a config table. Don't guess defaults that won't match the user's reality. Skip the form when the request is fully self-describing, or when the config is multi-row mutable state (that belongs in an in-app Form).
-
-7. **"Every morning" / "Monday" / "daily" / "while I sleep" / "pre-fetched" → propose cron in the same response.** Don't wait to be asked. Same rule for heavy scripts (slow APIs, paginated >50 items, multi-source serial calls): wire cron → SQLite snapshot table → app reads from DB. Live \`Query("exec")\` is fine for fast/lightweight scripts; cron + DB is mandatory when refresh time degrades the open-app experience.
+4. **"Every morning" / "Monday" / "daily" / "while I sleep" / "pre-fetched"** → propose a cron in the same response, don't wait to be asked. Same for heavy scripts (slow APIs, >50 paginated items, multi-source serial calls): wire cron → SQLite snapshot table → app reads from the DB. Live \`Query("exec")\` is fine for fast/light scripts.
 
 ## Refine flow
 
-When the composer text starts with \`Refine app "..." (id: ...)\` or \`Refine artifact "..." (id: ...)\`, the user is iterating on an existing surface. Read \`openui-app\`, then call \`app_update\` (apps) or \`update_markdown_artifact\` (artifacts) with that exact id. Do not create a new one. The patch should be 1–10 statements; never re-emit the whole program.
-
-## When NOT to render UI
-
-- Conversational chat ("hi", "thanks", "what do you mean by X").
-- Single-sentence factual answers where a chart adds no value.
-- Tool-call output already rendered (e.g. file diffs in a tool result).
-
-The bottom line: read the relevant skill BEFORE composing your response. Never explain that you can render UI — just do it.`;
+When the composer text starts with \`Refine app "..." (id: ...)\` or \`Refine artifact "..." (id: ...)\`, the user is iterating on an existing surface. For apps: \`read\` \`skills/openui-app/SKILL.md\`, then \`app_update\` with that exact id (a 1–10 statement patch — never the whole program). For artifacts: \`update_markdown_artifact\` with that id. Do not create a new one.`;
 
 function sanitizeDbSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "_");
@@ -304,18 +293,83 @@ export default definePluginEntry({
       },
       { commands: ["os"] },
     );
-
-    // ── Tiny preamble injection ──────────────────────────────────────────────
-    // The agent fetches the actual openui-lang prompt body via `read` on the
-    // skill files in `skills/openui-inline-ui/SKILL.md` and
-    // `skills/openui-app/SKILL.md`. Openclaw auto-lists those in the
-    // `<available_skills>` block, so this hook only adds the two-line nudge
-    // that tells the agent which skill to load when.
     api.on("before_prompt_build", (_event, ctx) => {
       if (!ctx.sessionKey?.endsWith(":openclaw-os")) {
         return;
       }
       return { prependSystemContext: CLAW_PREAMBLE };
+    });
+
+    const APP_SKILL_GATE_MESSAGE =
+      "Read `skills/openui-app/SKILL.md` first — it documents the openui-lang " +
+      "*app* surface (Query, Mutation, $state, Stack, the full component catalog, " +
+      "the lint loop). Reading it is required before `app_create` / `app_update`. " +
+      "Then retry this call.";
+
+    let appSkillGate: { path: string; sessions: Set<string> } | null = null;
+    const getAppSkillGate = (): { path: string; sessions: Set<string> } => {
+      if (!appSkillGate) {
+        const file = path.join(
+          api.runtime.state.resolveStateDir(),
+          "plugins",
+          "openclaw-os",
+          "app-skill-read-sessions.json",
+        );
+        let sessions: Set<string>;
+        try {
+          const parsed: unknown = JSON.parse(readFileSync(file, "utf-8"));
+          sessions = new Set(
+            Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [],
+          );
+        } catch {
+          sessions = new Set();
+        }
+        appSkillGate = { path: file, sessions };
+      }
+      return appSkillGate;
+    };
+    const markAppSkillRead = (sessionKey: string): void => {
+      const gate = getAppSkillGate();
+      if (gate.sessions.has(sessionKey)) {
+        return;
+      }
+      gate.sessions.add(sessionKey);
+      try {
+        mkdirSync(path.dirname(gate.path), { recursive: true });
+        writeFileSync(gate.path, JSON.stringify([...gate.sessions], null, 2), "utf-8");
+      } catch (err) {
+        api.logger.warn(`[openclaw-os-plugin] failed to persist app-skill gate: ${err}`);
+      }
+    };
+
+    api.on("before_tool_call", (event, ctx) => {
+      const sessionKey = ctx.sessionKey;
+      if (typeof sessionKey !== "string" || !sessionKey.endsWith(":openclaw-os")) {
+        return;
+      }
+
+      // Mark the session once the agent reads the app skill (via the `read` tool).
+      if (event.toolName === "read") {
+        const filePath = event.params["file_path"] ?? event.params["path"];
+        if (
+          typeof filePath === "string" &&
+          filePath.replace(/\\/g, "/").includes("openui-app/SKILL.md")
+        ) {
+          markAppSkillRead(sessionKey);
+        }
+        return;
+      }
+
+      if (
+        (event.toolName === "app_create" || event.toolName === "app_update") &&
+        !getAppSkillGate().sessions.has(sessionKey)
+      ) {
+        api.logger.info(
+          `[openclaw-os-plugin] ${event.toolName} blocked — openui-app skill not read in session ${sessionKey}`,
+        );
+        return { block: true, blockReason: APP_SKILL_GATE_MESSAGE };
+      }
+      return;
     });
 
     // ── Artifact store — lazy-initialized on first use ──────────────────────

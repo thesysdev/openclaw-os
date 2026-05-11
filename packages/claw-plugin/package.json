@@ -15,6 +15,7 @@
     "dist",
     "static",
     "skills",
+    "prompts",
     "openclaw.plugin.json",
     "README.md"
   ],
