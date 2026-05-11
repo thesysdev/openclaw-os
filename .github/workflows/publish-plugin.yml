@@ -1,4 +1,4 @@
-name: Publish NPM package
+name: Publish plugin to NPM
 
 permissions:
   id-token: write
