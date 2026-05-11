@@ -1,0 +1,46 @@
+name: Publish NPM package
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to publish"
+        required: true
+        type: choice
+        options:
+          - claw-plugin
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+          cache-dependency-path: "pnpm-lock.yaml"
+
+      - name: Install npm 11.6.4
+        run: npm install -g npm@11.6.4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run package checks
+        working-directory: ./packages/${{ inputs.package }}
+        run: pnpm run ci
+
+      - name: Publish package
+        working-directory: ./packages/${{ inputs.package }}
+        run: pnpm publish --access public
