@@ -241,8 +241,13 @@ export default definePluginEntry({
         return true;
       },
     });
+    const uiPort = api.config.gateway?.port ?? 18789;
+    const uiHost =
+      api.config.gateway?.bind === "custom" && api.config.gateway?.customBindHost
+        ? api.config.gateway.customBindHost
+        : "127.0.0.1";
     api.logger.info(
-      `[openclaw-os-plugin] static UI route at ${ROUTE_PREFIX} (root=${STATIC_ROOT})`,
+      `[openclaw-os-plugin] workspace UI mounted at http://${uiHost}:${uiPort}${ROUTE_PREFIX}/ (root ${STATIC_ROOT})`,
     );
 
     // ── CLI: `openclaw os url` ──────────────────────────────────────────────
