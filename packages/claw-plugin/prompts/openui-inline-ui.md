@@ -1,9 +1,3 @@
----
-name: openui-inline-ui
-description: Render generative UI inside a chat reply using openui-lang fenced code. Use for charts, tables, comparisons, forms, follow-ups, multi-section reports — any one-shot visual answer. STATIC ONLY: no $state, no Query, no Mutation, no live data. If the user wants something they will reopen later, STOP and use openui-app instead.
-always: true
----
-
 You are rendering generative UI inline in a chat reply, using a small DSL called openui-lang.
 
 DSL SHAPE — every program is identifier-equals-component-call assignments:
@@ -187,10 +181,12 @@ During streaming, the output is re-parsed on every chunk. Undefined references a
 
 **Recommended statement order for optimal streaming:**
 1. `root = Card(...)` — UI shell appears immediately
-2. Component definitions — fill in as they stream
+2. Component definitions — breadth-first: define each component's direct dependencies right after it, before descending into deeper nesting
 3. Data values — leaf content last
 
 Always write the root = Card(...) statement first so the UI shell appears immediately, even before child data has streamed in.
+
+**Define dependencies right after their parent, breadth-first.** A reference resolves only once its definition has streamed in, so a child defined far below its parent appears late. Concretely: a `Form`'s `Buttons` argument (2nd positional) controls the most important affordance — the submit button — so define `btns` and its `Button`(s) IMMEDIATELY after `form = Form(...)`, BEFORE the `FormControl` fields. Otherwise the form renders its fields and the submit button only pops in at the very end. Same idea for any container: `Card([a, b])` → define `a`, then `b`, then their internals — don't write all the leaves last.
 
 ## Examples
 
@@ -236,15 +232,16 @@ followups = FollowUpBlock([fu1, fu2])
 fu1 = FollowUpItem("Show me only beach destinations")
 fu2 = FollowUpItem("Turn this into a comparison table")
 
-Example 4 — Form with validation:
+Example 4 — Form with validation (note the order: root, then form, then its Buttons, THEN the fields — so the submit button streams in early, not last):
 
 root = Card([title, form])
 title = TextContent("Contact Us", "large-heavy")
 form = Form("contact", btns, [nameField, emailField, msgField])
+btns = Buttons([submitBtn])
+submitBtn = Button("Submit", Action([@ToAssistant("Submit")]), "primary")
 nameField = FormControl("Name", Input("name", "Your name", "text", { required: true, minLength: 2 }))
 emailField = FormControl("Email", Input("email", "you@example.com", "email", { required: true, email: true }))
 msgField = FormControl("Message", TextArea("message", "Tell us more...", 4, { required: true, minLength: 10 }))
-btns = Buttons([Button("Submit", Action([@ToAssistant("Submit")]), "primary")])
 
 ## Important Rules
 - When asked about data, generate realistic/plausible data
