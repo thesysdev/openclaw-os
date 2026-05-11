@@ -31,11 +31,6 @@ curl -fsSL https://openui.com/openclaw-os/install.sh | bash
 
 The installer downloads the source, builds the workspace UI, registers it as an OpenClaw plugin, restarts the gateway, and opens the dashboard in your browser.
 
-To uninstall:
-
-```bash
-curl -fsSL https://openui.com/openclaw-os/install.sh | bash -s -- uninstall
-```
 
 > The workspace runs at `http://localhost:18789/plugins/openclawos`; run **`openclaw os url`** for the pre-authenticated URL.
 >
