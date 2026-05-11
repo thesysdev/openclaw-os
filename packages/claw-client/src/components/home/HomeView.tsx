@@ -34,6 +34,25 @@ import { SectionHeader } from "./SectionHeader";
 import { NotifPanel } from "./notif/NotifPanel";
 import type { HomeNotif, NotifType } from "./notif/types";
 
+// Seeds a prompt into the composer (the home-page composer or, once in a
+// thread, the chat composer) — `SessionComposer` listens for this event.
+// Mirrors the command-palette priming in `AppOverlays`. Pass `submit: true`
+// to also send it immediately (the "Create an example" CTAs do); otherwise
+// the text just lands in the input for the user to tweak.
+export function primeComposer(text: string, submit = false) {
+  window.dispatchEvent(new CustomEvent("openclaw-os:prime-composer", { detail: { text, submit } }));
+}
+
+// Prompts seeded by the "Create an example" CTAs in the empty Apps /
+// Artifacts home sections (desktop + mobile). Rather than hard-coding one
+// app/doc, we let the agent propose something it can actually pull off with
+// whatever integrations and credentials are already wired up — lower-effort
+// and personalized.
+export const APP_EXAMPLE_PROMPT =
+  "Suggest a few apps you could build for me — dashboards, work trackers, calendars, etc. — using the tools and integrations I already have connected, then build the one I pick.";
+export const ARTIFACT_EXAMPLE_PROMPT =
+  "Suggest a couple of documents or reports you could put together for me based on what you know about my work, then draft the one I pick as an artifact.";
+
 // ────────────────────────────────────────────────────────────────────────────
 // Adapters: real app data → homepage view-models
 // ────────────────────────────────────────────────────────────────────────────
@@ -254,8 +273,12 @@ export function HomeView({
                       <br />
                       work trackers, marketing calendars, etc.
                     </p>
-                    <Button variant="secondary" size="md">
-                      See an example
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      onClick={() => primeComposer(APP_EXAMPLE_PROMPT, true)}
+                    >
+                      Create an example
                     </Button>
                   </div>
                 ) : (
@@ -294,8 +317,12 @@ export function HomeView({
                       <br />
                       slides and reports.
                     </p>
-                    <Button variant="secondary" size="md">
-                      See an example
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      onClick={() => primeComposer(ARTIFACT_EXAMPLE_PROMPT, true)}
+                    >
+                      Create an example
                     </Button>
                   </div>
                 ) : (

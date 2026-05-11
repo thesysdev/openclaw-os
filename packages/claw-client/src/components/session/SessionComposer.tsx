@@ -484,6 +484,9 @@ export function SessionComposer({
   const [isDragOver, setIsDragOver] = useState(false);
   const dragDepthRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // Set when a `prime-composer` event asks us to auto-send the seeded text.
+  // The flush effect below picks it up once the text has landed in state.
+  const submitAfterPrimeRef = useRef(false);
 
   // Rotating-placeholder UX (home composer only — `rotatingPlaceholders`
   // is undefined for chat). The hook owns the cycle interval, the
@@ -554,10 +557,14 @@ export function SessionComposer({
 
   useEffect(() => {
     const listener = (event: Event) => {
-      const detail = (event as CustomEvent<{ text?: string }>).detail;
+      const detail = (event as CustomEvent<{ text?: string; submit?: boolean }>).detail;
       if (!detail?.text) return;
       setTextContent(detail.text);
-      requestAnimationFrame(() => textareaRef.current?.focus());
+      if (detail.submit) {
+        submitAfterPrimeRef.current = true;
+      } else {
+        requestAnimationFrame(() => textareaRef.current?.focus());
+      }
     };
     window.addEventListener("openclaw-os:prime-composer", listener as EventListener);
     return () =>
@@ -652,6 +659,20 @@ export function SessionComposer({
 
     await sendPromise;
   };
+
+  // Flush a queued auto-submit (from a `prime-composer` event with
+  // `submit: true`) once the seeded text has actually landed in state — we
+  // can't call `handleSubmit` straight from the event listener because it
+  // reads `textContent` from the render closure, which is still empty there.
+  useEffect(() => {
+    if (!submitAfterPrimeRef.current || !textContent.trim()) return;
+    submitAfterPrimeRef.current = false;
+    void handleSubmit();
+    // `handleSubmit` is intentionally not a dep — the effect re-runs on the
+    // render where `textContent` equals the primed value, so this closure's
+    // `handleSubmit` already sees that text.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textContent]);
 
   // Drag-drop & clipboard-paste plumbing. Both route through `onAddFiles`,
   // which mirrors the file-picker path. We use a depth counter for dragenter/
