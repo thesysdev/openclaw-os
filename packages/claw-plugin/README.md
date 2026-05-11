@@ -28,8 +28,16 @@ The plugin teaches OpenUI Lang in two pieces, split by how often a turn needs ea
 For end users, install OpenClaw OS via the installer script from the [root README](../../README.md#quick-start):
 
 ```sh
+# Install
 curl -fsSL https://openui.com/openclaw-os/install.sh | bash
+
+# Uninstall
+curl -fsSL https://openui.com/openclaw-os/install.sh | bash -s -- uninstall
 ```
+
+### Opening the workspace
+
+The workspace is served from your gateway — most likely `http://localhost:18789/plugins/openclawos`. For the pre-authenticated URL, run `openclaw os url`.
 
 ### From a local clone
 
@@ -44,24 +52,13 @@ pnpm build
 # install scanner, and the bundled dist/ has no runtime deps to install.
 rm -rf node_modules
 
-# Install + reload
+# Install + reload, then open it
 openclaw plugins install ./packages/claw-plugin --force
 openclaw gateway restart
+openclaw os url
 ```
 
 If `~/.openclaw/openclaw.json` has a non-empty `plugins.allow` list, add `openclaw-os-plugin` to it. With an empty `plugins.allow` (allow-all) no action is needed; without pinning when an allow list is set, the gateway lazy-reloads the plugin on every tool lookup and `app_create` fails intermittently.
-
-Open the workspace at `http://localhost:18789/plugins/openclawos`. Paste the gateway URL (`ws://localhost:18789`) and the auth token from `~/.openclaw/openclaw.json` into the Settings dialog on first load.
-
-### Skipping the settings dialog
-
-To skip the dialog and get a pre-authenticated URL (token in the fragment, mirrors `openclaw dashboard`), use the CLI subcommand the plugin registers:
-
-```sh
-openclaw os url        # prints the setup URL with auth to stdout
-```
-
-This reads the gateway-validated config directly, so it survives `--dev` / `--profile` flags and is the recommended path for installers and onboarding scripts.
 
 ## Scripts
 

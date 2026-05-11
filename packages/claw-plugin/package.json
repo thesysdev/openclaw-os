@@ -3,6 +3,16 @@
   "version": "0.1.3",
   "type": "module",
   "description": "OpenClaw plugin that turns agent responses into Generative UI and serves the claw-client at /plugins/openclawos.",
+  "keywords": [
+    "openclaw",
+    "openclaw web ui",
+    "openclaw-plugin",
+    "openclaw-os",
+    "openui",
+    "openui-lang",
+    "generative-ui",
+    "agent-ui"
+  ],
   "license": "MIT",
   "homepage": "https://openui.com",
   "repository": {
