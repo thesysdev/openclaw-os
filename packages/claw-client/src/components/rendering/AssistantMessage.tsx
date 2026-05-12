@@ -12,7 +12,15 @@ import { Renderer } from "@openuidev/react-lang";
 import { Callout, Shell } from "@openuidev/react-ui";
 import { openuiChatLibrary } from "@openuidev/react-ui/genui-lib";
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Loader2, X } from "lucide-react";
-import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -314,12 +322,18 @@ function ReasoningDetail({ content }: { content: string }) {
   );
 }
 
+// Past this many timeline rows the panel stops growing and the body scrolls
+// internally — keeps long tool-heavy runs from pushing the conversation
+// hundreds of pixels down per message.
+const TIMELINE_SCROLL_THRESHOLD = 10;
+
 function ThinkingPanel({
   totalDurationMs,
   toolCallCount,
   inputTokens,
   outputTokens,
   isStreaming,
+  scrollBody = false,
   children,
 }: {
   totalDurationMs: number;
@@ -327,11 +341,25 @@ function ThinkingPanel({
   inputTokens: number;
   outputTokens: number;
   isStreaming: boolean;
+  scrollBody?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(isStreaming);
   const panelId = useId();
   const seconds = totalDurationMs > 0 ? (totalDurationMs / 1000).toFixed(1) : null;
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const followRef = useRef(true);
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+  }, []);
+  useLayoutEffect(() => {
+    if (!scrollBody || !isStreaming || !open || !followRef.current) return;
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  });
 
   const parts: ReactNode[] = [];
   if (isStreaming) {
@@ -410,7 +438,13 @@ function ThinkingPanel({
         className="overflow-hidden transition-[max-height,opacity] duration-300 ease-out"
         style={{ maxHeight: open ? 10000 : 0, opacity: open ? 1 : 0 }}
       >
-        <div className="mt-xs space-y-xs rounded-4xl bg-foreground p-m dark:bg-sunk-deep">
+        <div
+          ref={scrollRef}
+          onScroll={scrollBody ? handleScroll : undefined}
+          className={`mt-xs space-y-xs rounded-4xl bg-foreground p-m dark:bg-sunk-deep ${
+            scrollBody ? "max-h-[28rem] overflow-y-auto overscroll-contain" : ""
+          }`}
+        >
           {children}
         </div>
       </div>
@@ -733,6 +767,7 @@ export function AssistantMessage({ message }: Props) {
       {timelineItems.length > 0 ? (
         <ThinkingPanel
           isStreaming={isStreaming}
+          scrollBody={timelineItems.length > TIMELINE_SCROLL_THRESHOLD}
           totalDurationMs={Array.from(toolTraceMap.values()).reduce(
             (sum, t) => sum + (t.durationMs ?? 0),
             0,
