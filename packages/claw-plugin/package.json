@@ -14,10 +14,10 @@
     "agent-ui"
   ],
   "license": "MIT",
-  "homepage": "https://openui.com",
+  "homepage": "https://openui.com/openclaw-os",
   "repository": {
     "type": "git",
-    "url": "https://github.com/thesysdev/openclaw-ui.git",
+    "url": "https://github.com/thesysdev/openclaw-os.git",
     "directory": "packages/claw-plugin"
   },
   "main": "./dist/index.js",

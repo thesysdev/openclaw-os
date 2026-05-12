@@ -27,12 +27,16 @@ The plugin teaches OpenUI Lang in two pieces, split by how often a turn needs ea
 
 For end users, install OpenClaw OS via the installer script from the [root README](../../README.md#quick-start):
 
-```sh
-# Install
-curl -fsSL https://openui.com/openclaw-os/install.sh | bash
+macOS or Linux:
 
-# Uninstall
-curl -fsSL https://openui.com/openclaw-os/install.sh | bash -s -- uninstall
+```bash
+curl -fsSL https://openui.com/openclaw-os/install.sh | bash
+```
+
+Windows:
+
+```powershell
+powershell -c "irm https://openui.com/openclaw-os/install.ps1 | iex"
 ```
 
 ### Opening the workspace
@@ -48,9 +52,10 @@ pnpm bundle-ui
 # Build the plugin's own dist/ (esbuild bundle)
 pnpm build
 
-# Clear local node_modules. pnpm's escaping symlinks trip openclaw's
-# install scanner, and the bundled dist/ has no runtime deps to install.
-rm -rf node_modules
+# Clear local node_modules before installing. pnpm's escaping symlinks trip
+# openclaw's install scanner, and the bundled dist/ has no runtime deps.
+# macOS or Linux: rm -rf node_modules
+# Windows PowerShell: Remove-Item -Recurse -Force node_modules
 
 # Install + reload, then open it
 openclaw plugins install ./packages/claw-plugin --force

@@ -279,8 +279,7 @@ export function buildThreadContextPayload(params: {
       title: params.linkedApp.title,
       agentId: params.linkedApp.agentId,
       sessionKey: params.linkedApp.sessionKey,
-      instruction:
-        "This thread is linked to the app above. Use get_app/app_update when the user asks to refine or modify it.",
+      instruction: `The user's request applies to app "${params.linkedApp.title}" (id: ${params.linkedApp.appId}) — THIS one, even if other apps appear earlier in this conversation. Call get_app with this id, then app_update with this id. Do not create a new app.`,
     });
   }
 
@@ -291,8 +290,7 @@ export function buildThreadContextPayload(params: {
       title: params.linkedArtifact.title,
       agentId: params.linkedArtifact.agentId,
       sessionKey: params.linkedArtifact.sessionKey,
-      instruction:
-        "This thread is linked to the artifact above. Use get_artifact/artifact_update when the user asks to refine or modify it.",
+      instruction: `The user's request applies to artifact "${params.linkedArtifact.title}" (id: ${params.linkedArtifact.artifactId}) — THIS one, even if other artifacts appear earlier in this conversation. Call get_artifact with this id, then update_markdown_artifact with this id. Do not create a new artifact.`,
     });
   }
 

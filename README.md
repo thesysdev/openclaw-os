@@ -23,10 +23,18 @@ OpenClaw reads emails, manages files, runs scripts, and schedules work across to
 ---
 ## Quick Start
 
-Install OpenClaw OS into an existing OpenClaw setup with one command:
+Install OpenClaw OS into an existing OpenClaw setup with the command for your platform:
+
+macOS or Linux:
 
 ```bash
 curl -fsSL https://openui.com/openclaw-os/install.sh | bash
+```
+
+Windows:
+
+```powershell
+powershell -c "irm https://openui.com/openclaw-os/install.ps1 | iex"
 ```
 
 The installer downloads the source, builds the workspace UI, registers it as an OpenClaw plugin, restarts the gateway, and opens the dashboard in your browser.
@@ -34,7 +42,7 @@ The installer downloads the source, builds the workspace UI, registers it as an 
 
 > The workspace runs at `http://localhost:18789/plugins/openclawos`; run **`openclaw os url`** for the pre-authenticated URL.
 >
-> Don't have OpenClaw yet? Install it first from [openclaw.ai](https://openclaw.ai/install.sh), then run the command above.
+> Don't have OpenClaw yet? Install it first from [openclaw.ai](https://openclaw.ai/install.sh), then run the matching command above.
 >
 > Installing from a local clone: see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
