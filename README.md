@@ -37,7 +37,15 @@ Windows:
 powershell -c "irm https://openui.com/openclaw-os/install.ps1 | iex"
 ```
 
-The installer downloads the source, builds the workspace UI, registers it as an OpenClaw plugin, restarts the gateway, and opens the dashboard in your browser.
+The installer downloads the latest source, builds the workspace UI, registers it as an OpenClaw plugin, restarts the gateway, and opens the dashboard in your browser.
+
+or through published package
+
+```bash
+openclaw plugins install @openuidev/openclaw-os-plugin
+openclaw gateway restart
+openclaw os url
+```
 
 
 > The workspace runs at `http://localhost:18789/plugins/openclawos`; run **`openclaw os url`** for the pre-authenticated URL.
