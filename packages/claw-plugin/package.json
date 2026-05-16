@@ -1,6 +1,6 @@
 {
   "name": "@openuidev/openclaw-os-plugin",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "description": "OpenClaw plugin that turns agent responses into Generative UI and serves the claw-client at /plugins/openclawos.",
   "keywords": [

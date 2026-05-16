@@ -4,7 +4,7 @@ import { signMessage, toBase64Url } from "./device-identity";
 import type { ConnectParams } from "./types";
 import { GATEWAY_CLIENT_CAPS, GATEWAY_CLIENT_IDS, GATEWAY_CLIENT_MODES } from "./types";
 
-const PROTOCOL_VERSION = 3;
+const PROTOCOL_VERSION = 4;
 const CLIENT_ID = GATEWAY_CLIENT_IDS.CONTROL_UI;
 const CLIENT_MODE = GATEWAY_CLIENT_MODES.UI;
 const CLIENT_VERSION = "0.1.0";

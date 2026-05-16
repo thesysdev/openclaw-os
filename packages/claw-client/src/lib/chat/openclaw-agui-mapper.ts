@@ -48,6 +48,10 @@ export function createOpenClawAGUIMapper(onEvent: (event: Record<string, unknown
 } {
   let messageId: string | null = null;
   let emittedTextContent = false;
+  // Whether we've streamed visible assistant text into the current run's
+  // trailing text run. Used to decide if a v4 `replace` event needs a
+  // boundary marker to relegate the superseded draft.
+  let assistantTextStreamed = false;
   const activeToolCallIds = new Set<string>();
 
   const extractTextFromMessageContent = (message: unknown): string => {
@@ -98,6 +102,7 @@ export function createOpenClawAGUIMapper(onEvent: (event: Record<string, unknown
   const ensureMessageStarted = (runId: string) => {
     if (!messageId) {
       messageId = runId;
+      assistantTextStreamed = false;
       emitEvent({ type: EventType.TEXT_MESSAGE_START, messageId, role: "assistant" });
     }
   };
@@ -215,13 +220,49 @@ export function createOpenClawAGUIMapper(onEvent: (event: Record<string, unknown
       }
 
       if (evt.stream === "assistant") {
-        // `data.delta` from the openclaw 2026.5.x gateway is already
-        // incremental — the resolver subtracts cumulative snapshots upstream
-        // and emits only the new tokens. Forward straight to the AG-UI
-        // consumer; no client-side dedupe needed.
+        // v4 `replace`: the new cumulative text does NOT extend what we've
+        // already streamed (a rewrite — e.g. a heartbeat placeholder swapped
+        // for the real answer). AG-UI text content is append-only, so we
+        // can't mutate the prior text in place. Emit an `assistant_update`
+        // boundary marker: `extractAssistantTimeline` keeps only the LAST
+        // text run as the visible answer and relegates the superseded text
+        // before the marker into a collapsed draft row — the same primitive
+        // history-merger uses. Without the marker the old and new text would
+        // concatenate ("GotGot it…"-style duplication).
+        if (evt.data.replace === true) {
+          const replacement =
+            typeof evt.data.text === "string" && evt.data.text
+              ? evt.data.text
+              : typeof evt.data.delta === "string"
+                ? evt.data.delta
+                : "";
+          ensureMessageStarted(evt.runId);
+          if (assistantTextStreamed) {
+            emitEvent({
+              type: EventType.TEXT_MESSAGE_CONTENT,
+              messageId,
+              delta: encodeAssistantTimelineSegment({ type: "assistant_update", text: "" }),
+            });
+            assistantTextStreamed = false;
+          }
+          if (replacement) {
+            emittedTextContent = true;
+            assistantTextStreamed = true;
+            emitEvent({
+              type: EventType.TEXT_MESSAGE_CONTENT,
+              messageId,
+              delta: replacement,
+            });
+          }
+          return;
+        }
+        // Normal stream: `data.delta` is already incremental — the gateway
+        // subtracts cumulative snapshots upstream and emits only the new
+        // tokens. Forward straight to the AG-UI consumer; no dedupe needed.
         if (typeof evt.data.delta === "string" && evt.data.delta) {
           ensureMessageStarted(evt.runId);
           emittedTextContent = true;
+          assistantTextStreamed = true;
           emitEvent({
             type: EventType.TEXT_MESSAGE_CONTENT,
             messageId,
