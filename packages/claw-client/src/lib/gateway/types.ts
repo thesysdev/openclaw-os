@@ -150,7 +150,17 @@ export interface ChatEvent {
 
 // Typed data shapes for each event:agent stream variant
 export interface AssistantStreamData {
+  /** Incremental new tokens. On a `replace` event this is the full new text. */
   delta: string;
+  /** Cumulative assistant text so far (authoritative on `replace`). */
+  text?: string;
+  /**
+   * Set by the v4 gateway when the new cumulative text does NOT extend the
+   * previously streamed text (a rewrite, e.g. a heartbeat placeholder being
+   * swapped for the real answer). Consumers must discard prior streamed text
+   * rather than append.
+   */
+  replace?: boolean;
 }
 
 export interface ThinkingStreamData {
