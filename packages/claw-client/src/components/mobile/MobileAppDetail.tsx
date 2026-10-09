@@ -72,6 +72,7 @@ export function MobileAppDetail({
   const hasSiblings = (siblings?.length ?? 0) > 1 && Boolean(onSwitch);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setNotFound(false);
     setRecord(null);
@@ -79,10 +80,17 @@ export function MobileAppDetail({
     apps
       .getApp(appId)
       .then((r) => {
+        if (cancelled) return;
         if (!r) setNotFound(true);
         else setRecord(r);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      // A newer app selection or update owns the preview now.
+      cancelled = true;
+    };
   }, [appId, apps, updatedAt]);
 
   const handleAction = useCallback(

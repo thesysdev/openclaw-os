@@ -130,6 +130,7 @@ export function AppDetail({
   const { record: recordToolEntry, updateStatus: updateToolStatus } = toolLog;
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setNotFound(false);
     setRecord(null);
@@ -137,10 +138,17 @@ export function AppDetail({
     apps
       .getApp(appId)
       .then((r) => {
+        if (cancelled) return;
         if (!r) setNotFound(true);
         else setRecord(r);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      // A newer app selection or update owns the preview now.
+      cancelled = true;
+    };
   }, [appId, apps, updatedAt, refreshTick]);
 
   // Route built-in Renderer actions through the shared handler module.
